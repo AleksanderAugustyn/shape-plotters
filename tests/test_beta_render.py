@@ -2,6 +2,7 @@
 import numpy as np
 import pytest
 
+from src.core import quadrature
 from src.renders.beta import BetaRender
 
 # Probed in Task 3 Step 5: lib-VALID and necked (all five candidates passed;
@@ -22,9 +23,20 @@ def _params(betas: list[float]) -> dict[str, float]:
 def test_sphere(render: BetaRender) -> None:
     res = render.compute(_params([]), {"com": False})
     assert res.ok
-    assert np.allclose(res.radius, 1.0, atol=1e-12)
+    assert np.allclose(res.radius, 1.0, atol=1e-6)
+    assert res.scalars["vol_factor"] == pytest.approx(1.0, abs=1e-6)
     assert res.neck is None
     assert res.drho_dz is None
+
+
+def test_volume_fix_matches_wmmm_and_old_plotter(render: BetaRender) -> None:
+    # WMMM volume-fixes the beta grid (radius_grid_mod original_volume_factor);
+    # the old ShapePlotter PNG for this shape shows Radius Fixing Factor
+    # 0.99598851 — cross-plotter golden.
+    res = render.compute(_params([0.0, 0.20, 0.10]), {"com": False})
+    assert res.ok
+    assert res.scalars["vol_factor"] == pytest.approx(0.99598851, abs=1e-5)
+    assert quadrature.volume(res.theta, res.radius) == pytest.approx(4.0 * np.pi / 3.0, rel=1e-6)
 
 
 def test_com_toggle_reports_corrected_beta10(render: BetaRender) -> None:

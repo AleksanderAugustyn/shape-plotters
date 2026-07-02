@@ -74,6 +74,8 @@ Both renders fill both representations — no Python-side coordinate conversion:
 
 dR/dθ is computed engine-side via `np.gradient` — display only.
 
+**Beta volume fixing** (execution amendment, 2026-07-03): the lib returns unfixed R(θ), but WMMM's grid layer applies a volume-conservation radius multiplier (`radius_grid_mod` `original_volume_factor`) and the old ShapePlotter drew the fixed shape. BetaRender applies the same factor, ((4π/3)/V_shape)^(1/3), before returning and reports it as the `vol_factor` scalar (cross-checked against the old plotter's Radius Fixing Factor golden 0.99598851 for β₂=0.2, β₃=0.1). FoS conserves volume via the a₂ constraint — no fix needed (verified to 5 digits at the gate).
+
 ## 4. Engine behavior
 
 **Layout** (old ShapePlotter's gridspec, generalized): top-left R(θ) + dR/dθ (dotted derivative overlay, ShapePlotter style); top-right cross-section (mirrored ρ vs z, equal aspect; vertical neck line at z_neck when `neck` present — FoSFitter style); right side stats textbox; bottom strip sliders + buttons. One optional third plot slot: FoS fills it with ρ(z) + lib-native dρ/dz; beta leaves it empty and the gridspec collapses to two panels. No other layout branching.

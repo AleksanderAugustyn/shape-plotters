@@ -10,11 +10,13 @@ from __future__ import annotations
 import numpy as np
 import beta_parameterization as bp
 
+from src.core import quadrature
 from src.core.neck import find_neck_indices, neck_depth
 from src.core.result import NeckInfo, ShapeResult, SliderSpec, ToggleSpec
 
 N_GRID = 721
 N_BETAS = 8
+SPHERE_VOLUME = 4.0 * np.pi / 3.0  # unit sphere, R0 units
 
 
 class BetaRender:
@@ -38,8 +40,16 @@ class BetaRender:
             res = self._cache.radius_grid_with_com_shift(betas)
         else:
             res = self._cache.radius_grid(betas)
-        z = res.radii * np.cos(self._theta)
-        rho = res.radii * np.sin(self._theta)
+        # WMMM volume-fixes the grid (radius_grid_mod, original_volume_factor)
+        # and the old ShapePlotter drew the fixed shape; the lib returns raw
+        # R(theta), so apply the same radius multiplier here for parity.
+        vol_factor = 1.0
+        radii = res.radii
+        if res.ok:
+            vol_factor = float((SPHERE_VOLUME / quadrature.volume(self._theta, radii)) ** (1.0 / 3.0))
+            radii = radii * vol_factor
+        z = radii * np.cos(self._theta)
+        rho = radii * np.sin(self._theta)
         neck = None
         if res.ok:
             hit = find_neck_indices(rho)
@@ -48,12 +58,12 @@ class BetaRender:
                 neck = NeckInfo(z=float(z[i_neck]), rho=float(rho[i_neck]),
                                 depth=neck_depth(rho, i_neck, i_a, i_b),
                                 source="py heuristic")
-        scalars: dict[str, float] = {}
+        scalars: dict[str, float] = {"vol_factor": vol_factor}
         if res.corrected_beta10 is not None:
             scalars["corrected_beta10"] = res.corrected_beta10
         return ShapeResult(
             status=int(res.status), status_name=res.status.name, message=res.message,
-            theta=self._theta, radius=res.radii, z=z, rho=rho, drho_dz=None,
+            theta=self._theta, radius=radii, z=z, rho=rho, drho_dz=None,
             neck=neck, scalars=scalars, length_keys=frozenset())
 
     def filename(self, z: int, n: int, params: dict[str, float]) -> str:
