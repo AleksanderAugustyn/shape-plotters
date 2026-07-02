@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from typing import Callable
 
+import matplotlib
 from matplotlib.figure import Figure
 from matplotlib.widgets import Button, Slider, TextBox
 
@@ -43,6 +44,14 @@ class IntTextBox:
     def __init__(self, fig: Figure, rect: tuple[float, float, float, float],
                  label: str, initial: int, on_change: Callable[[], None]) -> None:
         self.box = TextBox(fig.add_axes(rect), label, initial=str(initial))
+        if matplotlib.__version__.startswith("3.11"):
+            # mpl 3.11.0 regression: TextBox._resize is wrapped by
+            # _call_with_reparented_event, which reads event.inaxes — absent on
+            # ResizeEvent — so every window resize logs an AttributeError.
+            # Replace the connection (last one made in TextBox.__init__),
+            # keeping the intended stop-typing-on-resize behavior.
+            fig.canvas.mpl_disconnect(self.box._cids[-1])
+            fig.canvas.mpl_connect("resize_event", lambda _e: self.box.stop_typing())
         self.value = int(initial)
         self._on_change = on_change
         self.box.on_submit(self._submit)

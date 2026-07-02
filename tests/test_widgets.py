@@ -29,6 +29,16 @@ def test_slider_row_fires_on_changed(fig) -> None:
     assert seen and seen[-1] == pytest.approx(1.01)
 
 
+def test_int_textbox_survives_window_resize(fig) -> None:
+    # mpl 3.11.0 regression: TextBox's resize handler crashes on
+    # ResizeEvent.inaxes; IntTextBox replaces the connection.
+    from matplotlib.backend_bases import ResizeEvent
+
+    IntTextBox(fig, (0.1, 0.1, 0.1, 0.05), "Z", 92, lambda: None)
+    fig.canvas.callbacks.exception_handler = None  # re-raise instead of logging
+    ResizeEvent("resize_event", fig.canvas)._process()
+
+
 def test_int_textbox_accepts_and_reverts(fig) -> None:
     calls: list[int] = []
     box = IntTextBox(fig, (0.1, 0.1, 0.1, 0.05), "Z", 92, lambda: calls.append(1))
