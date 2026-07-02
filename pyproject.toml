@@ -1,0 +1,9 @@
+[project]
+name = "shapeplotters"
+version = "0.1.0"
+description = "Interactive matplotlib plotters for nuclear shape parameterizations (beta, FoS)"
+requires-python = ">=3.10"
+dependencies = ["numpy>=2.0", "scipy>=1.11", "matplotlib>=3.8"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
