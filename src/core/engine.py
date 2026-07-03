@@ -28,11 +28,17 @@ NECK_COLOR = "tab:green"
 INVALID_COLOR = "0.55"
 UNITS_LABEL = "fm units"
 
+# WMMM scission bands: neck radius 1.2-1.5 fm (comparable because display
+# R0 = 1.16 fm equals WMMM's geometric R0; see FORD.md / v0.2 handoff).
+SCISSION_BAND_FM = (1.2, 1.5)
+SCISSION_LABEL = "scission bands"
+
 
 class ShapePlotterApp:
     def __init__(self, render) -> None:
         self.render = render
         self.fm_units = True
+        self.show_scission = False
         self.toggle_state = {t.key: t.default for t in render.toggles}
         self.last_result: ShapeResult | None = None
         self._last_ok: bool | None = None
@@ -75,6 +81,12 @@ class ShapePlotterApp:
         (self.shape_upper,) = ax.plot([], [], color=VALID_COLOR, lw=2)
         (self.shape_lower,) = ax.plot([], [], color=VALID_COLOR, lw=2)
         (self.neck_line,) = ax.plot([], [], color=NECK_COLOR, ls="--", lw=1.5)
+        self.scission_bands = [
+            ax.axhspan(SCISSION_BAND_FM[0], SCISSION_BAND_FM[1],
+                       color=NECK_COLOR, alpha=0.15, visible=False),
+            ax.axhspan(-SCISSION_BAND_FM[1], -SCISSION_BAND_FM[0],
+                       color=NECK_COLOR, alpha=0.15, visible=False),
+        ]
         ax.set_aspect("equal", adjustable="datalim")
         ax.set_xlabel(f"z [{unit}]")
         ax.set_ylabel(f"ρ [{unit}]")
@@ -104,14 +116,14 @@ class ShapePlotterApp:
             row.slider.on_changed(self.update)
             self.rows[spec.key] = row
             y += 0.031
-        self.z_box = IntTextBox(self.fig, (0.88, 0.40, 0.06, 0.030), "Z ", 92, self.update)
-        self.n_box = IntTextBox(self.fig, (0.88, 0.36, 0.06, 0.030), "N ", 144, self.update)
+        self.z_box = IntTextBox(self.fig, (0.88, 0.40, 0.06, 0.030), "Z ", 92, self._on_zn)
+        self.n_box = IntTextBox(self.fig, (0.88, 0.36, 0.06, 0.030), "N ", 144, self._on_zn)
         self.btn_reset = Button(self.fig.add_axes((0.86, 0.31, 0.10, 0.030)), "Reset")
         self.btn_reset.on_clicked(self._reset)
         self.btn_save = Button(self.fig.add_axes((0.86, 0.27, 0.10, 0.030)), "Save")
         self.btn_save.on_clicked(self._save)
-        labels = [UNITS_LABEL] + [t.label for t in self.render.toggles]
-        actives = [self.fm_units] + [t.default for t in self.render.toggles]
+        labels = [UNITS_LABEL, SCISSION_LABEL] + [t.label for t in self.render.toggles]
+        actives = [self.fm_units, self.show_scission] + [t.default for t in self.render.toggles]
         n = len(labels)
         self.checks = CheckButtons(
             self.fig.add_axes((0.86, 0.26 - 0.04 * n, 0.11, 0.04 * n)), labels, actives)
@@ -135,6 +147,10 @@ class ShapePlotterApp:
         if label == UNITS_LABEL:
             self.fm_units = not self.fm_units
             self._relabel_units()
+        elif label == SCISSION_LABEL:
+            self.show_scission = not self.show_scission
+            for band in self.scission_bands:
+                band.set_visible(self.show_scission)
         else:
             for t in self.render.toggles:
                 if t.label == label:
@@ -150,6 +166,31 @@ class ShapePlotterApp:
         if self.ax_extra is not None:
             self.ax_extra.set_xlabel(f"z [{unit}]")
             self.extra_legend.get_texts()[0].set_text(f"ρ(z) [{unit}]")
+        self._reposition_scission()
+
+    def _on_zn(self) -> None:
+        # Z/N changes the fm<->R0 scale, so fm-fixed band edges move in R0 mode.
+        self._reposition_scission()
+        self.update()
+
+    def _fm_to_display(self, v_fm: float) -> float:
+        if self.fm_units:
+            return v_fm
+        return v_fm / (R0_FM * float(self.z_box.value + self.n_box.value) ** (1.0 / 3.0))
+
+    def _reposition_scission(self) -> None:
+        lo, hi = (self._fm_to_display(v) for v in SCISSION_BAND_FM)
+        upper, lower = self.scission_bands
+        self._set_band(upper, lo, hi)
+        self._set_band(lower, -hi, -lo)
+
+    @staticmethod
+    def _set_band(band, ylo: float, yhi: float) -> None:
+        if hasattr(band, "set_height"):  # Rectangle (mpl >= 3.8, incl. 3.11)
+            band.set_y(ylo)
+            band.set_height(yhi - ylo)
+        else:                            # Polygon fallback for older mpl
+            band.set_xy([[0.0, ylo], [0.0, yhi], [1.0, yhi], [1.0, ylo]])
 
     def _reset(self, _event=None) -> None:
         # Each set_val fires update(); fine at 8 sliders.

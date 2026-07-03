@@ -60,6 +60,32 @@ def test_widget_draws_suppressed(app) -> None:
     assert not on, f"widgets still self-drawing: {on}"
 
 
+def _band_top(band) -> float:
+    if hasattr(band, "get_height"):            # Rectangle (mpl >= 3.8)
+        return band.get_y() + band.get_height()
+    return max(xy[1] for xy in band.get_xy())  # Polygon fallback
+
+
+def test_scission_bands_default_hidden(app) -> None:
+    assert len(app.scission_bands) == 2
+    assert not any(b.get_visible() for b in app.scission_bands)
+
+
+def test_scission_toggle_flips_visibility(app) -> None:
+    app._on_check("scission bands")
+    assert all(b.get_visible() for b in app.scission_bands)
+    app._on_check("scission bands")
+    assert not any(b.get_visible() for b in app.scission_bands)
+
+
+def test_scission_bands_rescale_on_unit_toggle(app) -> None:
+    assert _band_top(app.scission_bands[0]) == pytest.approx(1.5)  # fm mode
+    app._on_check("fm units")                                      # -> R0 units
+    a = app.z_box.value + app.n_box.value
+    expected = 1.5 / (R0_FM * a ** (1.0 / 3.0))
+    assert _band_top(app.scission_bands[0]) == pytest.approx(expected)
+
+
 def test_save_uses_render_filename(app, tmp_path, monkeypatch) -> None:
     monkeypatch.chdir(tmp_path)
     app._save()
