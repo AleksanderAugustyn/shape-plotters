@@ -86,6 +86,7 @@ On invalid shapes (`status != 0`) the libraries zero-fill outputs; `dr_dtheta` a
 - dR/dθ overlay uses `result.dr_dtheta` directly; the `np.gradient` call is deleted. fm mode scales it by R0 like other lengths.
 - Cross-section panel closes at the poles by appending endpoints at draw time: (z = +r_north, ρ = 0) and (z = −r_south, ρ = 0). Same for the R(θ) curve if visual pole gaps show at GL node extremes (first/last nodes sit ~1e-3 rad from the poles at n = 2048 — decide by eye during implementation).
 - Stats quadrature calls pass `dr_dtheta` through to `surface_area`.
+- z_cm marker: vertical line at z = z_cm on the cross-section panel (and the FoS ρ(z) panel, which shares the z axis), styled distinctly from the neck line, drawn from the same GL-quadrature value the stats box already shows, in the current display unit. Doubles as a visual COM check: beta with COM correction on and FoS (z-shift centering) should show it at z ≈ 0; beta with COM off shows the actual offset. Persistent artist, updated per draw — same pattern as the other engine-owned lines.
 
 ## 9. Testing and gate
 
@@ -96,7 +97,8 @@ On invalid shapes (`status != 0`) the libraries zero-fill outputs; `dr_dtheta` a
 5. FoS: `z_shift`/`a2` scalars unchanged vs v0.1 (same library math, same 7201 grid); pole radii match `c + z_shift` / `|z_shift − c|`.
 6. Invalid shape: zero-filled arrays including `dr_dtheta`/poles, greyed draw path intact, no exceptions.
 7. Pole closure: drawn cross-section arrays begin/end at ρ = 0 with the analytic pole z-values.
-8. Existing perf tests re-run: per-drag work is dot products; 2048-point lines vs 721 is negligible for matplotlib. No perf regression vs the engine v0.2 baselines.
+8. z_cm marker: present on the cross-section panel; at z ≈ 0 for beta with COM on and for FoS; at the quadrature z_cm value for beta with COM off (headless draw-path check).
+9. Existing perf tests re-run: per-drag work is dot products; 2048-point lines vs 721 is negligible for matplotlib. No perf regression vs the engine v0.2 baselines.
 
 Gate: `main.py beta` and `main.py fos` under WSLg; saved PNGs for known shapes spot-checked against v0.1 output (shapes visually identical; vol factor differs only in trailing digits).
 
