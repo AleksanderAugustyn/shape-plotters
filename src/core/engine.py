@@ -4,8 +4,10 @@ Owns display units (fm/R0 toggle; ShapeResult is R0 units), layout, widgets,
 invalid-shape greying, stats, and save. Everything shape-specific comes from
 the render (contract in src/core/result.py).
 
-Axes are cleared and replotted on every update — at 721 points this is fast
-enough for slider drags and removes all artist-state bookkeeping.
+Artists are created once at build; update() only mutates data, text, and
+visibility. v0.1 cleared and replotted every axes per slider event — legend
+and text layout made that the frame-time bottleneck (see
+docs/superpowers/specs/2026-07-03-engine-v0.2-performance-design.md).
 """
 from __future__ import annotations
 
@@ -33,7 +35,9 @@ class ShapePlotterApp:
         self.fm_units = True
         self.toggle_state = {t.key: t.default for t in render.toggles}
         self.last_result: ShapeResult | None = None
+        self._last_ok: bool | None = None
         self._build_figure()
+        self._build_artists()
         self._build_widgets()
         self.update()
 
@@ -54,6 +58,42 @@ class ShapePlotterApp:
         self.ax_extra = self.fig.add_subplot(gs[2]) if self.render.has_extra_panel else None
         self.ax_stats = self.fig.add_subplot(gs[ncols])
         self.ax_stats.axis("off")
+
+    def _build_artists(self) -> None:
+        # fm_units defaults to True; the unit toggle re-texts labels in place.
+        unit = "fm"
+        ax = self.ax_radius
+        (self.r_line,) = ax.plot([], [], color=VALID_COLOR, lw=2, label=f"R(θ) [{unit}]")
+        (self.dr_line,) = ax.plot([], [], color=DERIV_COLOR, lw=2, ls=":",
+                                  label="dR/dθ (display)")
+        ax.set_xlim(0.0, np.pi)  # also disables x-autoscale on this axes
+        ax.set_xlabel("θ [rad]")
+        self.radius_legend = ax.legend(loc="upper center", fontsize=8)
+        ax.grid(alpha=0.3)
+
+        ax = self.ax_shape
+        (self.shape_upper,) = ax.plot([], [], color=VALID_COLOR, lw=2)
+        (self.shape_lower,) = ax.plot([], [], color=VALID_COLOR, lw=2)
+        (self.neck_line,) = ax.plot([], [], color=NECK_COLOR, ls="--", lw=1.5)
+        ax.set_aspect("equal", adjustable="datalim")
+        ax.set_xlabel(f"z [{unit}]")
+        ax.set_ylabel(f"ρ [{unit}]")
+        ax.grid(alpha=0.3)
+
+        self.extra_legend = None
+        if self.ax_extra is not None:
+            ax = self.ax_extra
+            (self.extra_rho,) = ax.plot([], [], color=VALID_COLOR, lw=2,
+                                        label=f"ρ(z) [{unit}]")
+            (self.extra_drho,) = ax.plot([], [], color=DERIV_COLOR, lw=1.5, ls=":",
+                                         label="dρ/dz (lib)")
+            ax.set_xlabel(f"z [{unit}]")
+            self.extra_legend = ax.legend(loc="upper center", fontsize=8)
+            ax.grid(alpha=0.3)
+
+        self.stats_text = self.ax_stats.text(
+            0.0, 1.0, "", va="top", family="monospace", fontsize=9,
+            transform=self.ax_stats.transAxes)
 
     def _build_widgets(self) -> None:
         self.rows: dict[str, SliderRow] = {}
@@ -82,11 +122,22 @@ class ShapePlotterApp:
     def _on_check(self, label: str) -> None:
         if label == UNITS_LABEL:
             self.fm_units = not self.fm_units
+            self._relabel_units()
         else:
             for t in self.render.toggles:
                 if t.label == label:
                     self.toggle_state[t.key] = not self.toggle_state[t.key]
         self.update()
+
+    def _relabel_units(self) -> None:
+        # Rare event: re-text legends/labels in place instead of rebuilding them.
+        unit = "fm" if self.fm_units else "R0"
+        self.radius_legend.get_texts()[0].set_text(f"R(θ) [{unit}]")
+        self.ax_shape.set_xlabel(f"z [{unit}]")
+        self.ax_shape.set_ylabel(f"ρ [{unit}]")
+        if self.ax_extra is not None:
+            self.ax_extra.set_xlabel(f"z [{unit}]")
+            self.extra_legend.get_texts()[0].set_text(f"ρ(z) [{unit}]")
 
     def _reset(self, _event=None) -> None:
         # Each set_val fires update(); fine at 8 sliders.
@@ -112,52 +163,64 @@ class ShapePlotterApp:
         self.last_result = result
         scale = self._scale()
         unit = "fm" if self.fm_units else "R0"
-        color = VALID_COLOR if result.ok else INVALID_COLOR
-        deriv = DERIV_COLOR if result.ok else INVALID_COLOR
-        alpha = 1.0 if result.ok else 0.45
 
-        ax = self.ax_radius
-        ax.clear()
         r = result.radius * scale
-        ax.plot(result.theta, r, color=color, alpha=alpha, lw=2, label=f"R(θ) [{unit}]")
-        ax.plot(result.theta, np.gradient(r, result.theta), color=deriv, alpha=alpha,
-                lw=2, ls=":", label="dR/dθ (display)")
-        ax.set_xlim(0.0, np.pi)
-        ax.set_xlabel("θ [rad]")
-        ax.legend(loc="upper center", fontsize=8)
-        ax.grid(alpha=0.3)
+        self.r_line.set_data(result.theta, r)
+        self.dr_line.set_data(result.theta, np.gradient(r, result.theta))
 
-        ax = self.ax_shape
-        ax.clear()
         z, rho = result.z * scale, result.rho * scale
-        ax.plot(z, rho, color=color, alpha=alpha, lw=2)
-        ax.plot(z, -rho, color=color, alpha=alpha, lw=2)
+        self.shape_upper.set_data(z, rho)
+        self.shape_lower.set_data(z, -rho)
         if result.neck is not None:
             zn, rn = result.neck.z * scale, result.neck.rho * scale
-            ax.vlines(zn, -rn, rn, color=NECK_COLOR, ls="--", lw=1.5)
-        ax.set_aspect("equal", adjustable="datalim")
-        ax.set_xlabel(f"z [{unit}]")
-        ax.set_ylabel(f"ρ [{unit}]")
-        ax.grid(alpha=0.3)
-        ax.set_title(f"{result.status_name}: {result.message}" if not result.ok else "",
-                     color="tab:red", fontsize=9)
+            self.neck_line.set_data([zn, zn], [-rn, rn])
+            self.neck_line.set_visible(True)
+        else:
+            self.neck_line.set_visible(False)
 
         if self.ax_extra is not None:
-            ax = self.ax_extra
-            ax.clear()
-            ax.plot(z, rho, color=color, alpha=alpha, lw=2, label=f"ρ(z) [{unit}]")
+            self.extra_rho.set_data(z, rho)
             if result.drho_dz is not None:
                 # drho/dz is a unit-free slope: both lengths scale identically.
-                ax.plot(z, result.drho_dz, color=deriv, alpha=alpha, lw=1.5, ls=":",
-                        label="dρ/dz (lib)")
-            ax.set_xlabel(f"z [{unit}]")
-            ax.legend(loc="upper center", fontsize=8)
-            ax.grid(alpha=0.3)
+                self.extra_drho.set_data(z, result.drho_dz)
+                self.extra_drho.set_visible(True)
+            else:
+                self.extra_drho.set_visible(False)
 
-        self._update_stats(result, scale, unit)
+        self._apply_validity(result.ok)
+        title = "" if result.ok else f"{result.status_name}: {result.message}"
+        if self.ax_shape.get_title() != title:
+            self.ax_shape.set_title(title, color="tab:red", fontsize=9)
+
+        self.stats_text.set_text(self._stats_block(result, scale, unit))
+
+        # visible_only: the hidden neck line keeps stale data by design.
+        for ax in (self.ax_radius, self.ax_shape, self.ax_extra):
+            if ax is not None:
+                ax.relim(visible_only=True)
+                ax.autoscale_view()
         self.fig.canvas.draw_idle()
 
-    def _update_stats(self, result: ShapeResult, scale: float, unit: str) -> None:
+    def _apply_validity(self, ok: bool) -> None:
+        # Color/alpha churn only on the valid<->invalid flip, not per frame.
+        if ok == self._last_ok:
+            return
+        self._last_ok = ok
+        color = VALID_COLOR if ok else INVALID_COLOR
+        deriv = DERIV_COLOR if ok else INVALID_COLOR
+        alpha = 1.0 if ok else 0.45
+        for line in (self.r_line, self.shape_upper, self.shape_lower):
+            line.set_color(color)
+            line.set_alpha(alpha)
+        self.dr_line.set_color(deriv)
+        self.dr_line.set_alpha(alpha)
+        if self.ax_extra is not None:
+            self.extra_rho.set_color(color)
+            self.extra_rho.set_alpha(alpha)
+            self.extra_drho.set_color(deriv)
+            self.extra_drho.set_alpha(alpha)
+
+    def _stats_block(self, result: ShapeResult, scale: float, unit: str) -> str:
         lines = [f"[{self.render.name}]  units: {unit}"]
         if not result.ok:
             lines += [f"INVALID: {result.status_name} ({result.status})", ""]
@@ -177,10 +240,7 @@ class ShapePlotterApp:
         lines += ["", f"volume  = {v:.4f} {unit}³ (py quad)",
                   f"surface = {s:.4f} {unit}² (py quad)",
                   f"z_cm    = {zc:.4f} {unit} (py quad)"]
-        self.ax_stats.clear()
-        self.ax_stats.axis("off")
-        self.ax_stats.text(0.0, 1.0, "\n".join(lines), va="top", family="monospace",
-                           fontsize=9, transform=self.ax_stats.transAxes)
+        return "\n".join(lines)
 
     def run(self) -> None:
         plt.show()

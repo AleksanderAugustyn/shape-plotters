@@ -41,6 +41,17 @@ def test_invalid_shape_greys_and_banners() -> None:
     plt.close(a.fig)
 
 
+def test_neck_line_visibility_tracks_result() -> None:
+    a = ShapePlotterApp(BetaRender())
+    assert a.last_result.neck is None          # defaults: sphere, no neck
+    assert not a.neck_line.get_visible()
+    a.rows["beta2"].slider.set_val(1.5)        # necked shape (verified)
+    assert a.last_result.neck is not None
+    assert a.neck_line.get_visible()
+    import matplotlib.pyplot as plt
+    plt.close(a.fig)
+
+
 def test_save_uses_render_filename(app, tmp_path, monkeypatch) -> None:
     monkeypatch.chdir(tmp_path)
     app._save()
