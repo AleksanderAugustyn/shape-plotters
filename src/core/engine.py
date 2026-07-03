@@ -116,6 +116,18 @@ class ShapePlotterApp:
         self.checks = CheckButtons(
             self.fig.add_axes((0.86, 0.26 - 0.04 * n, 0.11, 0.04 * n)), labels, actives)
         self.checks.on_clicked(self._on_check)
+        self._suppress_widget_draws()
+
+    def _suppress_widget_draws(self) -> None:
+        # update() issues the single authoritative draw_idle(); without this,
+        # Slider.set_val adds a second full-figure draw per event. IntTextBox
+        # is excluded: TextBox needs its own draws for typing echo.
+        widgets: list = [self.btn_reset, self.btn_save, self.checks]
+        for row in self.rows.values():
+            widgets += [row.slider, row.btn_dec, row.btn_inc]
+        for w in widgets:
+            if hasattr(w, "drawon"):  # guard against future mpl API changes
+                w.drawon = False
 
     # ---------- callbacks ----------
 

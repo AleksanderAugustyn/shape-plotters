@@ -52,6 +52,14 @@ def test_neck_line_visibility_tracks_result() -> None:
     plt.close(a.fig)
 
 
+def test_widget_draws_suppressed(app) -> None:
+    widgets = [app.btn_reset, app.btn_save, app.checks]
+    for row in app.rows.values():
+        widgets += [row.slider, row.btn_dec, row.btn_inc]
+    on = [w for w in widgets if getattr(w, "drawon", False)]
+    assert not on, f"widgets still self-drawing: {on}"
+
+
 def test_save_uses_render_filename(app, tmp_path, monkeypatch) -> None:
     monkeypatch.chdir(tmp_path)
     app._save()
