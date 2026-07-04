@@ -93,3 +93,59 @@ def test_save_uses_render_filename(app, tmp_path, monkeypatch) -> None:
         app.z_box.value, app.n_box.value,
         {k: r.slider.val for k, r in app.rows.items()})
     assert (tmp_path / expected).exists()
+
+
+def test_dr_overlay_uses_lib_derivative(app) -> None:
+    expected = app.last_result.dr_dtheta * app._scale()
+    np.testing.assert_array_equal(app.dr_line.get_ydata(), expected)
+
+
+def test_cross_section_closes_at_poles() -> None:
+    a = ShapePlotterApp(BetaRender())
+    a.rows["beta2"].slider.set_val(1.5)
+    xy = a.shape_upper.get_xydata()
+    scale = a._scale()
+    assert xy[0][1] == 0.0 and xy[-1][1] == 0.0          # rho = 0 at both ends
+    # Beta z runs from +north to -south (theta ascending -> cos descending).
+    assert xy[0][0] == pytest.approx(a.last_result.r_north * scale)
+    assert xy[-1][0] == pytest.approx(-a.last_result.r_south * scale)
+    import matplotlib.pyplot as plt
+    plt.close(a.fig)
+
+
+def test_zcm_marker_tracks_com() -> None:
+    a = ShapePlotterApp(BetaRender())
+    assert a.zcm_point.get_visible()
+    assert a.zcm_point.get_ydata()[0] == 0.0             # point sits on the z axis
+    assert a.zcm_point.get_xdata()[0] == pytest.approx(0.0, abs=1e-9)   # sphere
+    a.rows["beta3"].slider.set_val(0.4)                  # octupole asymmetry, COM off
+    assert abs(a.zcm_point.get_xdata()[0]) > 0.01        # clear offset (fm), COM off
+    a._on_check("COM correction")                        # COM on -> back to ~0
+    assert a.zcm_point.get_xdata()[0] == pytest.approx(0.0, abs=1e-4)
+    import matplotlib.pyplot as plt
+    plt.close(a.fig)
+
+
+def test_zcm_marker_on_fos_profile_panel() -> None:
+    a = ShapePlotterApp(FoSRender())
+    a.rows["a3"].slider.set_val(0.3)                     # asymmetric; z-shift centers COM
+    assert a.zcm_point.get_visible()
+    assert a.zcm_point.get_xdata()[0] == pytest.approx(0.0, abs=1e-3)
+    assert a.zcm_extra is not None and a.zcm_extra.get_visible()
+    assert a.zcm_extra.get_xdata()[0] == a.zcm_point.get_xdata()[0]
+    import matplotlib.pyplot as plt
+    plt.close(a.fig)
+
+
+def test_zcm_marker_hidden_on_invalid() -> None:
+    a = ShapePlotterApp(BetaRender())
+    a.rows["beta2"].slider.set_val(4.0)                  # invalid shape
+    assert not a.zcm_point.get_visible()
+    import matplotlib.pyplot as plt
+    plt.close(a.fig)
+
+
+def test_stats_labeled_gl(app) -> None:
+    text = app.stats_text.get_text()
+    assert "(GL)" in text
+    assert "(py quad)" not in text

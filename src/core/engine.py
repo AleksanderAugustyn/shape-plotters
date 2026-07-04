@@ -71,7 +71,7 @@ class ShapePlotterApp:
         ax = self.ax_radius
         (self.r_line,) = ax.plot([], [], color=VALID_COLOR, lw=2, label=f"R(θ) [{unit}]")
         (self.dr_line,) = ax.plot([], [], color=DERIV_COLOR, lw=2, ls=":",
-                                  label="dR/dθ (display)")
+                                  label="dR/dθ (lib)")
         ax.set_xlim(0.0, np.pi)  # also disables x-autoscale on this axes
         ax.set_xlabel("θ [rad]")
         self.radius_legend = ax.legend(loc="upper center", fontsize=8)
@@ -81,6 +81,9 @@ class ShapePlotterApp:
         (self.shape_upper,) = ax.plot([], [], color=VALID_COLOR, lw=2)
         (self.shape_lower,) = ax.plot([], [], color=VALID_COLOR, lw=2)
         (self.neck_line,) = ax.plot([], [], color=NECK_COLOR, ls="--", lw=1.5)
+        # z_cm marker: red point on the z axis (COM of an axially symmetric shape).
+        (self.zcm_point,) = ax.plot([], [], marker="o", ms=6, ls="",
+                                    color="tab:red", zorder=5)
         self.scission_bands = [
             ax.axhspan(SCISSION_BAND_FM[0], SCISSION_BAND_FM[1],
                        color=NECK_COLOR, alpha=0.15, visible=False),
@@ -93,12 +96,15 @@ class ShapePlotterApp:
         ax.grid(alpha=0.3)
 
         self.extra_legend = None
+        self.zcm_extra = None
         if self.ax_extra is not None:
             ax = self.ax_extra
             (self.extra_rho,) = ax.plot([], [], color=VALID_COLOR, lw=2,
                                         label=f"ρ(z) [{unit}]")
             (self.extra_drho,) = ax.plot([], [], color=DERIV_COLOR, lw=1.5, ls=":",
                                          label="dρ/dz (lib)")
+            (self.zcm_extra,) = ax.plot([], [], marker="o", ms=6, ls="",
+                                        color="tab:red", zorder=5)
             ax.set_xlabel(f"z [{unit}]")
             self.extra_legend = ax.legend(loc="upper center", fontsize=8)
             ax.grid(alpha=0.3)
@@ -219,14 +225,19 @@ class ShapePlotterApp:
 
         r = result.radius * scale
         self.r_line.set_data(result.theta, r)
-        self.dr_line.set_data(result.theta, np.gradient(r, result.theta))
+        self.dr_line.set_data(result.theta, result.dr_dtheta * scale)
 
         z, rho = result.z * scale, result.rho * scale
-        self.shape_upper.set_data(z, rho)
-        self.shape_lower.set_data(z, -rho)
+        # GL nodes exclude theta = 0/pi; close the outline with the analytic poles.
+        rn, rs = result.r_north * scale, result.r_south * scale
+        first, last = (-rs, rn) if (z.size > 1 and z[0] < z[-1]) else (rn, -rs)
+        z_c = np.concatenate(([first], z, [last]))
+        rho_c = np.concatenate(([0.0], rho, [0.0]))
+        self.shape_upper.set_data(z_c, rho_c)
+        self.shape_lower.set_data(z_c, -rho_c)
         if result.neck is not None:
-            zn, rn = result.neck.z * scale, result.neck.rho * scale
-            self.neck_line.set_data([zn, zn], [-rn, rn])
+            zn, rn_neck = result.neck.z * scale, result.neck.rho * scale
+            self.neck_line.set_data([zn, zn], [-rn_neck, rn_neck])
             self.neck_line.set_visible(True)
         else:
             self.neck_line.set_visible(False)
@@ -245,7 +256,16 @@ class ShapePlotterApp:
         if self.ax_shape.get_title() != title:
             self.ax_shape.set_title(title, color="tab:red", fontsize=9)
 
-        self.stats_text.set_text(self._stats_block(result, scale, unit))
+        v = quadrature.volume(result.theta, result.radius) * scale**3
+        s = quadrature.surface_area(result.theta, result.radius, result.dr_dtheta) * scale**2
+        zc = quadrature.z_cm(result.theta, result.radius) * scale
+        self.zcm_point.set_data([zc], [0.0])
+        self.zcm_point.set_visible(result.ok)
+        if self.zcm_extra is not None:
+            self.zcm_extra.set_data([zc], [0.0])
+            self.zcm_extra.set_visible(result.ok)
+
+        self.stats_text.set_text(self._stats_block(result, scale, unit, v, s, zc))
 
         # visible_only: the hidden neck line keeps stale data by design.
         for ax in (self.ax_radius, self.ax_shape, self.ax_extra):
@@ -273,7 +293,8 @@ class ShapePlotterApp:
             self.extra_drho.set_color(deriv)
             self.extra_drho.set_alpha(alpha)
 
-    def _stats_block(self, result: ShapeResult, scale: float, unit: str) -> str:
+    def _stats_block(self, result: ShapeResult, scale: float, unit: str,
+                     v: float, s: float, zc: float) -> str:
         lines = [f"[{self.render.name}]  units: {unit}"]
         if not result.ok:
             lines += [f"INVALID: {result.status_name} ({result.status})", ""]
@@ -287,12 +308,9 @@ class ShapePlotterApp:
                       f"  z = {result.neck.z * scale:.4f} {unit}",
                       f"  ρ = {result.neck.rho * scale:.4f} {unit}",
                       f"  depth = {result.neck.depth:.3f}"]
-        v = quadrature.volume(result.theta, result.radius) * scale**3
-        s = quadrature.surface_area(result.theta, result.radius, result.dr_dtheta) * scale**2
-        zc = quadrature.z_cm(result.theta, result.radius) * scale
-        lines += ["", f"volume  = {v:.4f} {unit}³ (py quad)",
-                  f"surface = {s:.4f} {unit}² (py quad)",
-                  f"z_cm    = {zc:.4f} {unit} (py quad)"]
+        lines += ["", f"volume  = {v:.4f} {unit}³ (GL)",
+                  f"surface = {s:.4f} {unit}² (GL)",
+                  f"z_cm    = {zc:.4f} {unit} (GL)"]
         return "\n".join(lines)
 
     def run(self) -> None:
