@@ -1,19 +1,21 @@
 """Beta (Legendre) render over the beta_parameterization package.
 
-R(theta)-native: the cylindrical profile is derived parametrically
-(z = R cos(theta), rho = R sin(theta)). The neck is the Python display-only
-heuristic (src/core/neck.py) — graduating it into the library is recorded
-future work (spec section 7).
+GL-native: R(theta) and analytic dR/dtheta come from the library's node-set
+API evaluated on the shared GL-2048 set (src/core/nodes.py) — in sync with
+the energy model's dense grid. The neck is the Python display-only heuristic
+(src/core/neck.py) — graduating it into the library is recorded future work.
 """
 from __future__ import annotations
 
 import numpy as np
 import beta_parameterization as bp
 
-from src.core import quadrature
+from src.core import nodes, quadrature
 from src.core.neck import find_neck_indices, neck_depth
 from src.core.result import NeckInfo, ShapeResult, SliderSpec, ToggleSpec
 
+# Cache constructor still requires a uniform-grid size; no uniform-grid
+# feature is used (the argument goes away with the library's 2.3.0 cleanup).
 N_GRID = 721
 N_BETAS = 8
 SPHERE_VOLUME = 4.0 * np.pi / 3.0  # unit sphere, R0 units
@@ -32,26 +34,39 @@ class BetaRender:
 
     def __init__(self) -> None:
         self._cache = bp.Cache(max_beta_params=N_BETAS, n_grid=N_GRID)
-        self._theta = bp.theta_grid(N_GRID)
+        self._node_set = self._cache.build_node_set(nodes.THETA)
 
     def compute(self, params: dict[str, float], toggles: dict[str, bool]) -> ShapeResult:
         betas = [params[f"beta{i}"] for i in range(1, N_BETAS + 1)]
-        if toggles.get("com", False):
-            res = self._cache.radius_grid_with_com_shift(betas)
-        else:
-            res = self._cache.radius_grid(betas)
-        # WMMM volume-fixes the grid (radius_grid_mod, original_volume_factor)
-        # and the old ShapePlotter drew the fixed shape; the lib returns raw
-        # R(theta), so apply the same radius multiplier here for parity.
+        resolved = self._cache.resolve_shape(
+            betas, apply_com_correction=toggles.get("com", False))
+        rd = None
+        if resolved.ok:
+            rd = self._cache.radius_and_derivative(resolved.beta_con, self._node_set)
+        ok = rd is not None and rd.ok
+
         vol_factor = 1.0
-        radii = res.radii
-        if res.ok:
-            vol_factor = float((SPHERE_VOLUME / quadrature.volume(self._theta, radii)) ** (1.0 / 3.0))
-            radii = radii * vol_factor
-        z = radii * np.cos(self._theta)
-        rho = radii * np.sin(self._theta)
+        if ok:
+            # WMMM's exact GL volume factor (the library's original_volume_factor):
+            # radii arrive pre-scaled everywhere — derivative and poles included.
+            raw_volume = (2.0 * np.pi / 3.0) * float(np.sum(nodes.W * rd.radii**3))
+            vol_factor = float((SPHERE_VOLUME / raw_volume) ** (1.0 / 3.0))
+            radii = rd.radii * vol_factor
+            dr_dtheta = rd.dr_dtheta * vol_factor
+            r_north = resolved.r_north * vol_factor
+            r_south = resolved.r_south * vol_factor
+            # Beta's R(θ) is the true shape; its COM sits on the z axis at z_cm
+            # (nonzero when COM correction is off — the marker shows the offset).
+            z_cm = quadrature.z_cm(nodes.THETA, radii)
+        else:
+            radii = np.zeros(nodes.N_NODES)
+            dr_dtheta = np.zeros(nodes.N_NODES)
+            r_north = r_south = z_cm = 0.0
+
+        z = radii * nodes.X
+        rho = radii * nodes.SIN_THETA
         neck = None
-        if res.ok:
+        if ok:
             hit = find_neck_indices(rho)
             if hit is not None:
                 i_neck, i_a, i_b = hit
@@ -59,12 +74,15 @@ class BetaRender:
                                 depth=neck_depth(rho, i_neck, i_a, i_b),
                                 source="py heuristic")
         scalars: dict[str, float] = {"vol_factor": vol_factor}
-        if res.corrected_beta10 is not None:
-            scalars["corrected_beta10"] = res.corrected_beta10
+        if resolved.ok:
+            scalars["corrected_beta10"] = resolved.corrected_beta10
+        primary = rd if resolved.ok else resolved
         return ShapeResult(
-            status=int(res.status), status_name=res.status.name, message=res.message,
-            theta=self._theta, radius=radii, z=z, rho=rho, drho_dz=None,
-            neck=neck, scalars=scalars, length_keys=frozenset())
+            status=int(primary.status), status_name=primary.status.name,
+            message=primary.message,
+            theta=nodes.THETA, radius=radii, z=z, rho=rho, drho_dz=None,
+            neck=neck, scalars=scalars, length_keys=frozenset(),
+            dr_dtheta=dr_dtheta, r_north=r_north, r_south=r_south, z_cm=z_cm)
 
     def filename(self, z: int, n: int, params: dict[str, float]) -> str:
         betas = "_".join(f"{params[f'beta{i}']:.2f}" for i in range(1, N_BETAS + 1))

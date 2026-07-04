@@ -2,11 +2,11 @@
 import numpy as np
 import pytest
 
+from src.core import nodes
 from src.renders.fos import FoSRender
 
 SPHERE = {"c": 1.0, "a3": 0.0, "a4": 0.0, "a5": 0.0, "a6": 0.0, "a7": 0.0, "a8": 0.0}
-# Probed lib-VALID necked shape (the archived FoSFitter c=2.25/a3=0.25/a4=0.72
-# is ERROR_NOT_STAR_CONVEX in the library, anticipated by the plan).
+# Probed lib-VALID necked shape (carried over from v0.1).
 NECKED = {**SPHERE, "c": 2.0, "a4": 0.6}
 
 
@@ -18,14 +18,35 @@ def render() -> FoSRender:
 def test_sphere(render: FoSRender) -> None:
     res = render.compute(SPHERE, {})
     assert res.ok
+    assert res.theta is nodes.THETA
     assert np.allclose(res.radius, 1.0, atol=1e-12)
+    assert np.allclose(res.dr_dtheta, 0.0, atol=1e-9)
+    assert res.r_north == pytest.approx(1.0, abs=1e-14)
+    assert res.r_south == pytest.approx(1.0, abs=1e-14)
+    assert res.z_cm == 0.0                                 # FoS shape is COM-centered
     assert res.scalars["z_shift"] == pytest.approx(0.0, abs=1e-14)
-    # Lib convention: a2 is the volume-constraint correction a4/3 - a6/5 + a8/7
-    # (compute_fos_a2_f) — 0 for the sphere, NOT FoSFitter's unrelated r0^2/c.
     assert res.scalars["a2"] == pytest.approx(0.0, abs=1e-14)
     assert "z_shift" in res.length_keys
     assert res.neck is None
     assert res.drho_dz is not None and res.drho_dz.shape == res.rho.shape
+
+
+def test_pole_radii_formula(render: FoSRender) -> None:
+    # Spec (library design 3.2): r_north = c + z_shift, r_south = |z_shift - c|.
+    res = render.compute(NECKED, {})
+    assert res.ok
+    zs, c = res.scalars["z_shift"], NECKED["c"]
+    assert res.r_north == pytest.approx(c + zs, abs=1e-12)
+    assert res.r_south == pytest.approx(abs(zs - c), abs=1e-12)
+    assert res.z_cm == 0.0                                 # true shape COM-centered
+
+
+def test_dr_dtheta_matches_gradient(render: FoSRender) -> None:
+    res = render.compute(NECKED, {})
+    assert res.ok
+    fd = np.gradient(res.radius, res.theta)
+    tol = 1e-3 * (1.0 + float(np.max(np.abs(res.dr_dtheta))))
+    assert float(np.max(np.abs(res.dr_dtheta - fd))) < tol
 
 
 def test_necked_shape(render: FoSRender) -> None:
@@ -42,6 +63,8 @@ def test_invalid_c_returns_status_not_exception(render: FoSRender) -> None:
     assert not res.ok
     assert res.status_name in ("ERROR_INVALID_C", "ERROR_INVALID_ARGUMENTS")
     assert res.neck is None
+    assert res.radius.shape == (nodes.N_NODES,) and not res.radius.any()
+    assert res.dr_dtheta.shape == (nodes.N_NODES,) and not res.dr_dtheta.any()
 
 
 def test_slider_specs_and_filename(render: FoSRender) -> None:

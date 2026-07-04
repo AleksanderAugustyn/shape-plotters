@@ -1,18 +1,22 @@
 """FoS render over the fos_parameterization package.
 
-rho(z)-native (lib-exact drho_dz, lib-native neck); R(theta) comes from the
-library's own radius_grid, so no Python coordinate conversion is needed.
-Neck position/radius are lib values; only the displayed depth reuses the
-shared peak analysis on the profile.
+rho(z)-native (lib-exact drho_dz, lib-native neck); R(theta) and analytic
+dR/dtheta come from the library's arbitrary-node evaluator on the shared
+GL-2048 set (src/core/nodes.py) — in sync with the energy model's dense
+grid. Neck position/radius are lib values; only the displayed depth reuses
+the shared peak analysis on the profile.
 """
 from __future__ import annotations
 
+import numpy as np
 import fos_parameterization as fp
 
+from src.core import nodes
 from src.core.neck import find_neck_indices, neck_depth
 from src.core.result import NeckInfo, ShapeResult, SliderSpec, ToggleSpec
 
-N_GRID = 721
+N_GRID = 721        # rho(z) display panel only
+N_RHO_GRID = 7201   # shape() validity grid — WMMM's N_FOS_RHO_GRID_POINTS
 PARAM_KEYS = ("c", "a3", "a4", "a5", "a6", "a7", "a8")
 
 
@@ -30,11 +34,26 @@ class FoSRender:
 
     def compute(self, params: dict[str, float], toggles: dict[str, bool]) -> ShapeResult:
         arr = [params[k] for k in PARAM_KEYS]
-        rad = fp.radius_grid(arr, N_GRID)
+        shp = fp.shape(arr, N_RHO_GRID)
         prof = fp.rho_profile(arr, N_GRID)
-        primary = rad if rad.status != 0 else prof
+        rd = fp.radius_and_derivative(arr, nodes.THETA, shp.z_shift) if shp.ok else None
+        ok = shp.ok and rd is not None and rd.ok and prof.ok
+
+        if ok:
+            radii, dr_dtheta = rd.radii, rd.dr_dtheta
+        else:
+            radii = np.zeros(nodes.N_NODES)
+            dr_dtheta = np.zeros(nodes.N_NODES)
+
+        if not shp.ok:
+            status, status_name, message = int(shp.status), shp.status.name, shp.message
+        elif rd is not None and not rd.ok:
+            status, status_name, message = int(rd.status), rd.status.name, ""
+        else:
+            status, status_name, message = int(prof.status), prof.status.name, prof.message
+
         neck_info = None
-        if rad.ok and prof.ok:
+        if ok:
             nk = fp.neck(arr)
             if nk.ok and nk.found:
                 depth = 0.0
@@ -43,14 +62,17 @@ class FoSRender:
                     depth = neck_depth(prof.rho, *hit)
                 neck_info = NeckInfo(z=nk.z_neck, rho=nk.rho_neck,
                                      depth=depth, source="lib")
+        # The FoS shape is COM-centered by definition (rho_profile is the COM
+        # frame). The R(θ) representation carries the star-convexity shift, so its
+        # own COM is offset — the engine draws that overlay separately.
         return ShapeResult(
-            status=int(primary.status), status_name=primary.status.name,
-            message=primary.message,
-            theta=fp.theta_grid(N_GRID), radius=rad.radii,
+            status=status, status_name=status_name, message=message,
+            theta=nodes.THETA, radius=radii,
             z=prof.z, rho=prof.rho, drho_dz=prof.drho_dz,
             neck=neck_info,
-            scalars={"z_shift": fp.z_shift(arr), "a2": fp.a2(arr)},
-            length_keys=frozenset({"z_shift"}))
+            scalars={"z_shift": shp.z_shift, "a2": fp.a2(arr)},
+            length_keys=frozenset({"z_shift"}),
+            dr_dtheta=dr_dtheta, r_north=shp.r_north, r_south=shp.r_south, z_cm=0.0)
 
     def filename(self, z: int, n: int, params: dict[str, float]) -> str:
         return (f"fos_shape_Z{z}_N{n}_c{params['c']:.2f}"

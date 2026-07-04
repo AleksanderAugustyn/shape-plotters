@@ -25,6 +25,7 @@ R0_FM = 1.16
 VALID_COLOR = "tab:blue"
 DERIV_COLOR = "tab:red"
 NECK_COLOR = "tab:green"
+RTHETA_COLOR = "tab:orange"   # R(θ) star-convex representation (FoS shifted shapes)
 INVALID_COLOR = "0.55"
 UNITS_LABEL = "fm units"
 
@@ -71,16 +72,29 @@ class ShapePlotterApp:
         ax = self.ax_radius
         (self.r_line,) = ax.plot([], [], color=VALID_COLOR, lw=2, label=f"R(θ) [{unit}]")
         (self.dr_line,) = ax.plot([], [], color=DERIV_COLOR, lw=2, ls=":",
-                                  label="dR/dθ (display)")
+                                  label="dR/dθ (lib)")
         ax.set_xlim(0.0, np.pi)  # also disables x-autoscale on this axes
         ax.set_xlabel("θ [rad]")
         self.radius_legend = ax.legend(loc="upper center", fontsize=8)
         ax.grid(alpha=0.3)
 
         ax = self.ax_shape
-        (self.shape_upper,) = ax.plot([], [], color=VALID_COLOR, lw=2)
+        (self.shape_upper,) = ax.plot([], [], color=VALID_COLOR, lw=2, label="shape")
         (self.shape_lower,) = ax.plot([], [], color=VALID_COLOR, lw=2)
         (self.neck_line,) = ax.plot([], [], color=NECK_COLOR, ls="--", lw=1.5)
+        # z_cm marker: red point on the z axis (COM of an axially symmetric shape).
+        (self.zcm_point,) = ax.plot([], [], marker="o", ms=6, ls="",
+                                    color="tab:red", zorder=5, label="z_cm")
+        # R(θ) star-convex representation, drawn where it actually sits (offset
+        # from the true shape) for FoS shapes with a non-zero star-convexity
+        # shift; carries its own z_cm marker. Hidden otherwise.
+        (self.rtheta_upper,) = ax.plot([], [], color=RTHETA_COLOR, lw=1.2, ls="--",
+                                       alpha=0.9, visible=False, label="R(θ) star-convex")
+        (self.rtheta_lower,) = ax.plot([], [], color=RTHETA_COLOR, lw=1.2, ls="--",
+                                       alpha=0.9, visible=False)
+        (self.rtheta_zcm,) = ax.plot([], [], marker="o", ms=6, ls="",
+                                     color=RTHETA_COLOR, zorder=5, visible=False,
+                                     label="z_cm (R(θ))")
         self.scission_bands = [
             ax.axhspan(SCISSION_BAND_FM[0], SCISSION_BAND_FM[1],
                        color=NECK_COLOR, alpha=0.15, visible=False),
@@ -91,14 +105,21 @@ class ShapePlotterApp:
         ax.set_xlabel(f"z [{unit}]")
         ax.set_ylabel(f"ρ [{unit}]")
         ax.grid(alpha=0.3)
+        # Distinguishes the true shape from the R(θ) overlay; built once and only
+        # shown while the overlay is active (update() toggles visibility).
+        self.shape_legend = ax.legend(loc="upper right", fontsize=7)
+        self.shape_legend.set_visible(False)
 
         self.extra_legend = None
+        self.zcm_extra = None
         if self.ax_extra is not None:
             ax = self.ax_extra
             (self.extra_rho,) = ax.plot([], [], color=VALID_COLOR, lw=2,
                                         label=f"ρ(z) [{unit}]")
             (self.extra_drho,) = ax.plot([], [], color=DERIV_COLOR, lw=1.5, ls=":",
                                          label="dρ/dz (lib)")
+            (self.zcm_extra,) = ax.plot([], [], marker="o", ms=6, ls="",
+                                        color="tab:red", zorder=5)
             ax.set_xlabel(f"z [{unit}]")
             self.extra_legend = ax.legend(loc="upper center", fontsize=8)
             ax.grid(alpha=0.3)
@@ -219,14 +240,23 @@ class ShapePlotterApp:
 
         r = result.radius * scale
         self.r_line.set_data(result.theta, r)
-        self.dr_line.set_data(result.theta, np.gradient(r, result.theta))
+        self.dr_line.set_data(result.theta, result.dr_dtheta * scale)
 
         z, rho = result.z * scale, result.rho * scale
-        self.shape_upper.set_data(z, rho)
-        self.shape_lower.set_data(z, -rho)
+        rn, rs = result.r_north * scale, result.r_south * scale
+        # Beta's R(θ) parametric outline is open at the GL poles → append the
+        # analytic poles; the FoS ρ(z) profile already ends at ρ=0 → draw as-is.
+        if rho.size > 1 and max(abs(float(rho[0])), abs(float(rho[-1]))) > 1e-9:
+            first, last = (-rs, rn) if z[0] < z[-1] else (rn, -rs)
+            z_c = np.concatenate(([first], z, [last]))
+            rho_c = np.concatenate(([0.0], rho, [0.0]))
+        else:
+            z_c, rho_c = z, rho
+        self.shape_upper.set_data(z_c, rho_c)
+        self.shape_lower.set_data(z_c, -rho_c)
         if result.neck is not None:
-            zn, rn = result.neck.z * scale, result.neck.rho * scale
-            self.neck_line.set_data([zn, zn], [-rn, rn])
+            zn, rn_neck = result.neck.z * scale, result.neck.rho * scale
+            self.neck_line.set_data([zn, zn], [-rn_neck, rn_neck])
             self.neck_line.set_visible(True)
         else:
             self.neck_line.set_visible(False)
@@ -245,7 +275,35 @@ class ShapePlotterApp:
         if self.ax_shape.get_title() != title:
             self.ax_shape.set_title(title, color="tab:red", fontsize=9)
 
-        self.stats_text.set_text(self._stats_block(result, scale, unit))
+        v = quadrature.volume(result.theta, result.radius) * scale**3
+        s = quadrature.surface_area(result.theta, result.radius, result.dr_dtheta) * scale**2
+        zc = result.z_cm * scale                      # true-shape COM (display frame)
+        self.zcm_point.set_data([zc], [0.0])
+        self.zcm_point.set_visible(result.ok)
+        if self.zcm_extra is not None:
+            self.zcm_extra.set_data([zc], [0.0])
+            self.zcm_extra.set_visible(result.ok)
+
+        # When the star-convexity shift puts R(θ) in a different frame than the
+        # true shape (FoS with a3/a5/a7 ≠ 0), draw R(θ) where it actually sits,
+        # with its own z_cm marker at z_cm(R). Beta's R(θ) IS the true shape, so
+        # the two frames coincide and this overlay stays hidden.
+        zc_r = quadrature.z_cm(result.theta, result.radius) * scale
+        show_rtheta = bool(result.ok and abs(zc_r - zc) > 1e-6 * (1.0 + abs(zc)))
+        if show_rtheta:
+            zr = result.radius * np.cos(result.theta) * scale
+            rr = result.radius * np.sin(result.theta) * scale
+            first, last = (-rs, rn) if zr[0] < zr[-1] else (rn, -rs)
+            zr = np.concatenate(([first], zr, [last]))
+            rr = np.concatenate(([0.0], rr, [0.0]))
+            self.rtheta_upper.set_data(zr, rr)
+            self.rtheta_lower.set_data(zr, -rr)
+            self.rtheta_zcm.set_data([zc_r], [0.0])
+        for art in (self.rtheta_upper, self.rtheta_lower, self.rtheta_zcm):
+            art.set_visible(show_rtheta)
+        self.shape_legend.set_visible(show_rtheta)
+
+        self.stats_text.set_text(self._stats_block(result, scale, unit, v, s, zc))
 
         # visible_only: the hidden neck line keeps stale data by design.
         for ax in (self.ax_radius, self.ax_shape, self.ax_extra):
@@ -273,7 +331,8 @@ class ShapePlotterApp:
             self.extra_drho.set_color(deriv)
             self.extra_drho.set_alpha(alpha)
 
-    def _stats_block(self, result: ShapeResult, scale: float, unit: str) -> str:
+    def _stats_block(self, result: ShapeResult, scale: float, unit: str,
+                     v: float, s: float, zc: float) -> str:
         lines = [f"[{self.render.name}]  units: {unit}"]
         if not result.ok:
             lines += [f"INVALID: {result.status_name} ({result.status})", ""]
@@ -287,12 +346,9 @@ class ShapePlotterApp:
                       f"  z = {result.neck.z * scale:.4f} {unit}",
                       f"  ρ = {result.neck.rho * scale:.4f} {unit}",
                       f"  depth = {result.neck.depth:.3f}"]
-        v = quadrature.volume(result.theta, result.radius) * scale**3
-        s = quadrature.surface_area(result.theta, result.radius) * scale**2
-        zc = quadrature.z_cm(result.theta, result.radius) * scale
-        lines += ["", f"volume  = {v:.4f} {unit}³ (py quad)",
-                  f"surface = {s:.4f} {unit}² (py quad)",
-                  f"z_cm    = {zc:.4f} {unit} (py quad)"]
+        lines += ["", f"volume  = {v:.4f} {unit}³ (GL)",
+                  f"surface = {s:.4f} {unit}² (GL)",
+                  f"z_cm    = {zc:.4f} {unit} (GL)"]
         return "\n".join(lines)
 
     def run(self) -> None:
