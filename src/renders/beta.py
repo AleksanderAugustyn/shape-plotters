@@ -8,8 +8,9 @@ the energy model's dense grid. The neck is the Python display-only heuristic
 Two shapes are drawn. The default (blue) shape uses beta10 (= the beta1 slider,
 the l=1 dipole term) as set. The COM-corrected (orange) overlay ignores that
 slider value and uses corrected_beta10 — the dipole the library computes from
-beta2..beta8 to place the center of mass at the origin — shown only when it
-differs meaningfully from the slider shape.
+beta2..beta8 to place the center of mass at the origin —
+shown only when corrected_beta10 differs from the slider beta1 by more than
+the overlay threshold (the two shapes then genuinely differ).
 """
 from __future__ import annotations
 
@@ -22,8 +23,10 @@ from src.core.result import NeckInfo, ShapeResult, SliderSpec
 
 N_BETAS = 8
 SPHERE_VOLUME = 4.0 * np.pi / 3.0  # unit sphere, R0 units
-# Below this |corrected_beta10| the COM-corrected shape coincides with the
-# slider shape, so the orange overlay is suppressed (slider units).
+# The COM-corrected shape coincides with the slider shape when the corrected
+# dipole equals the slider beta1 (beta10 is a shape parameter, not a
+# translation knob); below this |corrected_beta10 - beta1| the orange overlay
+# is suppressed (slider units).
 OVERLAY_BETA10_THRESHOLD = 0.001
 
 
@@ -101,14 +104,14 @@ class BetaRender:
 
         scalars: dict[str, float] = {"vol_factor": vol_factor}
         # COM-corrected (orange) overlay: beta10 recomputed from beta2..beta8 to
-        # center the COM. Built only when it meaningfully differs from the slider
-        # shape (|corrected_beta10| > threshold); below that the two coincide.
+        # center the COM. Built only when it differs from the slider shape
+        # (|corrected_beta10 - beta1| > threshold); below that the two coincide.
         overlay_z = overlay_rho = None
         overlay_z_cm = 0.0
         corrected = self._cache.resolve_shape(betas, apply_com_correction=True)
         if corrected.ok:
             scalars["corrected_beta10"] = corrected.corrected_beta10
-            if ok and abs(corrected.corrected_beta10) > OVERLAY_BETA10_THRESHOLD:
+            if ok and abs(corrected.corrected_beta10 - betas[0]) > OVERLAY_BETA10_THRESHOLD:
                 rd_c = self._cache.radius_and_derivative(corrected.beta_con, self._node_set)
                 if rd_c.ok:
                     vf_c = _unit_volume_factor(rd_c.radii)

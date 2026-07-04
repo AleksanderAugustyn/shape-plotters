@@ -114,6 +114,25 @@ def test_invalid_shape_returns_status_not_exception(render: BetaRender) -> None:
     assert res.r_north == 0.0 and res.r_south == 0.0
 
 
+def test_overlay_when_slider_beta1_differs(render: BetaRender) -> None:
+    # Symmetric multipoles with a nonzero slider beta1: corrected_beta10 ~ 0,
+    # yet the slider shape differs from the COM-corrected one — beta10 is a
+    # shape parameter, not a translation. The overlay must show.
+    res = render.compute(_params([0.5, 0.30, 0.0, 0.10]), {})
+    assert res.ok
+    assert abs(res.scalars["corrected_beta10"]) <= 1e-3
+    assert res.overlay_z is not None
+
+
+def test_no_overlay_when_slider_matches_corrected(render: BetaRender) -> None:
+    # Slider beta1 set to the corrected dipole: the two shapes coincide.
+    first = render.compute(_params([0.0, 0.85, 0.35, 0.18]), {})
+    corrected = first.scalars["corrected_beta10"]
+    res = render.compute(_params([corrected, 0.85, 0.35, 0.18]), {})
+    assert res.ok
+    assert res.overlay_z is None
+
+
 def test_slider_specs_and_filename(render: BetaRender) -> None:
     assert [s.key for s in render.slider_specs] == [f"beta{i}" for i in range(1, 9)]
     assert (render.slider_specs[0].vmin, render.slider_specs[0].vmax) == (-1.6, 1.6)
