@@ -60,6 +60,10 @@ class ShapeResult:
     neck: NeckInfo | None
     scalars: dict[str, float]      # lib-native, R0 units where dimensional
     length_keys: frozenset[str]    # which scalars scale with the fm toggle
+    # GL-native additions (defaults dropped once both renders fill them):
+    dr_dtheta: Array | None = None   # lib-exact analytic dR/dθ, scaled like radius
+    r_north: float = 0.0             # analytic R(0), R0 units, scaled like radius
+    r_south: float = 0.0             # analytic R(pi), R0 units, scaled like radius
 
     @property
     def ok(self) -> bool:
