@@ -15,7 +15,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.widgets import Button, CheckButtons
 
-from src.core import quadrature
+from src.core import energy, quadrature
 from src.core.result import ShapeResult
 from src.core.widgets import IntTextBox, SliderRow
 
@@ -43,6 +43,8 @@ class ShapePlotterApp:
         self.toggle_state = {t.key: t.default for t in render.toggles}
         self.last_result: ShapeResult | None = None
         self._last_ok: bool | None = None
+        self._stats_base = ""
+        self._energy_lines: list[str] = []
         self._build_figure()
         self._build_artists()
         self._build_widgets()
@@ -152,6 +154,14 @@ class ShapePlotterApp:
         self.checks = CheckButtons(
             self.fig.add_axes((0.86, 0.26 - 0.04 * n, 0.11, 0.04 * n)), labels, actives)
         self.checks.on_clicked(self._on_check)
+        self.btn_energy = None
+        if energy.available():
+            # Right column, below the toggle block; absent (layout untouched)
+            # when the local WMMM install is missing.
+            self.btn_energy = Button(
+                self.fig.add_axes((0.86, 0.26 - 0.04 * n - 0.045, 0.10, 0.030)),
+                "Energy")
+            self.btn_energy.on_clicked(self._on_energy)
         self._suppress_widget_draws()
 
     def _suppress_widget_draws(self) -> None:
@@ -159,6 +169,8 @@ class ShapePlotterApp:
         # Slider.set_val adds a second full-figure draw per event. IntTextBox
         # is excluded: TextBox needs its own draws for typing echo.
         widgets: list = [self.btn_reset, self.btn_save, self.checks]
+        if self.btn_energy is not None:
+            widgets.append(self.btn_energy)
         for row in self.rows.values():
             widgets += [row.slider, row.btn_dec, row.btn_inc]
         for w in widgets:
@@ -226,6 +238,45 @@ class ShapePlotterApp:
         fname = self.render.filename(self.z_box.value, self.n_box.value, params)
         self.fig.savefig(fname, dpi=300, bbox_inches="tight")
         print(f"Saved {fname}")
+
+    def _refresh_stats(self) -> None:
+        self.stats_text.set_text("\n".join([self._stats_base, *self._energy_lines]))
+
+    def _on_energy(self, _event=None) -> None:
+        result = self.last_result
+        if result is None or not result.ok:
+            self._energy_lines = ["", "WMMM: shape invalid (not computed)"]
+        else:
+            params = {k: row.slider.val for k, row in self.rows.items()}
+            requests = self.render.energy_requests(params, result)
+            lines: list[str] = []
+            for req in requests:
+                res = energy.compute(
+                    req.param_type, self.z_box.value, self.n_box.value,
+                    req.shape, com_correction=req.com_correction)
+                lines += self._energy_block(
+                    req.label if len(requests) > 1 else None, res)
+            self._energy_lines = lines
+        self._refresh_stats()
+        self.fig.canvas.draw_idle()
+
+    @staticmethod
+    def _energy_block(label: str | None, res: energy.EnergyResult) -> list[str]:
+        # Energies are MeV — deliberately outside the fm/R0 unit toggle.
+        head = "WMMM" if label is None else f"WMMM ({label})"
+        if res.error is not None:
+            return ["", f"{head}: error", f"  {res.error}"]
+        if not res.is_valid:
+            return ["", f"{head}: invalid shape"]
+        return ["", f"{head} [MeV]:",
+                f"  E_total = {res.total_energy:.4f}",
+                f"  E_macro = {res.macro_energy:.4f}",
+                f"  E_micro = {res.micro_energy:.4f}",
+                f"  mass_ex = {res.mass_excess:.4f}",
+                f"  E_surf  = {res.surface_energy:.4f}",
+                f"  E_coul  = {res.coulomb_energy:.4f}",
+                f"  gap_p = {res.proton_pairing_gap:.4f}  k_p = {res.proton_k}",
+                f"  gap_n = {res.neutron_pairing_gap:.4f}  k_n = {res.neutron_k}"]
 
     # ---------- drawing ----------
 
@@ -315,7 +366,9 @@ class ShapePlotterApp:
             art.set_visible(show_rtheta)
         self.shape_legend.set_visible(show_rtheta)
 
-        self.stats_text.set_text(self._stats_block(result, scale, unit, v, s, zc))
+        self._stats_base = self._stats_block(result, scale, unit, v, s, zc)
+        self._energy_lines = []   # any shape/Z/N/unit change invalidates energies
+        self._refresh_stats()
 
         # visible_only: the hidden neck line keeps stale data by design.
         for ax in (self.ax_radius, self.ax_shape, self.ax_extra):
