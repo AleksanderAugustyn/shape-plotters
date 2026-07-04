@@ -79,21 +79,22 @@ class ShapePlotterApp:
         ax.grid(alpha=0.3)
 
         ax = self.ax_shape
-        (self.shape_upper,) = ax.plot([], [], color=VALID_COLOR, lw=2)
+        (self.shape_upper,) = ax.plot([], [], color=VALID_COLOR, lw=2, label="shape")
         (self.shape_lower,) = ax.plot([], [], color=VALID_COLOR, lw=2)
         (self.neck_line,) = ax.plot([], [], color=NECK_COLOR, ls="--", lw=1.5)
         # z_cm marker: red point on the z axis (COM of an axially symmetric shape).
         (self.zcm_point,) = ax.plot([], [], marker="o", ms=6, ls="",
-                                    color="tab:red", zorder=5)
+                                    color="tab:red", zorder=5, label="z_cm")
         # R(θ) star-convex representation, drawn where it actually sits (offset
         # from the true shape) for FoS shapes with a non-zero star-convexity
         # shift; carries its own z_cm marker. Hidden otherwise.
         (self.rtheta_upper,) = ax.plot([], [], color=RTHETA_COLOR, lw=1.2, ls="--",
-                                       alpha=0.9, visible=False)
+                                       alpha=0.9, visible=False, label="R(θ) star-convex")
         (self.rtheta_lower,) = ax.plot([], [], color=RTHETA_COLOR, lw=1.2, ls="--",
                                        alpha=0.9, visible=False)
         (self.rtheta_zcm,) = ax.plot([], [], marker="o", ms=6, ls="",
-                                     color=RTHETA_COLOR, zorder=5, visible=False)
+                                     color=RTHETA_COLOR, zorder=5, visible=False,
+                                     label="z_cm (R(θ))")
         self.scission_bands = [
             ax.axhspan(SCISSION_BAND_FM[0], SCISSION_BAND_FM[1],
                        color=NECK_COLOR, alpha=0.15, visible=False),
@@ -104,6 +105,10 @@ class ShapePlotterApp:
         ax.set_xlabel(f"z [{unit}]")
         ax.set_ylabel(f"ρ [{unit}]")
         ax.grid(alpha=0.3)
+        # Distinguishes the true shape from the R(θ) overlay; built once and only
+        # shown while the overlay is active (update() toggles visibility).
+        self.shape_legend = ax.legend(loc="upper right", fontsize=7)
+        self.shape_legend.set_visible(False)
 
         self.extra_legend = None
         self.zcm_extra = None
@@ -296,6 +301,7 @@ class ShapePlotterApp:
             self.rtheta_zcm.set_data([zc_r], [0.0])
         for art in (self.rtheta_upper, self.rtheta_lower, self.rtheta_zcm):
             art.set_visible(show_rtheta)
+        self.shape_legend.set_visible(show_rtheta)
 
         self.stats_text.set_text(self._stats_block(result, scale, unit, v, s, zc))
 

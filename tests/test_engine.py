@@ -161,6 +161,7 @@ def test_fos_rtheta_overlay_when_star_convex_shift() -> None:
     assert a.zcm_point.get_xdata()[0] == pytest.approx(0.0, abs=1e-9)
     # R(θ) representation drawn where it actually sits, with its own marker.
     assert a.rtheta_upper.get_visible() and a.rtheta_zcm.get_visible()
+    assert a.shape_legend.get_visible()                  # legend labels both outlines
     assert abs(a.rtheta_zcm.get_xdata()[0]) > 0.1        # clearly offset (fm)
     ry = a.rtheta_upper.get_ydata()
     assert ry[0] == 0.0 and ry[-1] == 0.0                # overlay closes at rho = 0
@@ -175,6 +176,7 @@ def test_no_rtheta_overlay_for_symmetric_fos() -> None:
     assert a.last_result.ok
     assert not a.rtheta_upper.get_visible()
     assert not a.rtheta_zcm.get_visible()
+    assert not a.shape_legend.get_visible()
     import matplotlib.pyplot as plt
     plt.close(a.fig)
 
@@ -187,5 +189,6 @@ def test_no_rtheta_overlay_for_beta() -> None:
     # Beta's R(θ) is the true shape: no separate representation to overlay.
     assert not a.rtheta_upper.get_visible()
     assert not a.rtheta_zcm.get_visible()
+    assert not a.shape_legend.get_visible()
     import matplotlib.pyplot as plt
     plt.close(a.fig)

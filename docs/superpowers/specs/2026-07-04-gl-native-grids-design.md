@@ -84,9 +84,10 @@ On invalid shapes (`status != 0`) the libraries zero-fill outputs; `dr_dtheta` a
 ## 8. Engine
 
 - dR/dθ overlay uses `result.dr_dtheta` directly; the `np.gradient` call is deleted. fm mode scales it by R0 like other lengths.
-- Cross-section panel closes at the poles by appending endpoints at draw time: (z = +r_north, ρ = 0) and (z = −r_south, ρ = 0). Same for the R(θ) curve if visual pole gaps show at GL node extremes (first/last nodes sit ~1e-3 rad from the poles at n = 2048 — decide by eye during implementation).
+- Cross-section closure is per-render, decided by whether the outline already reaches ρ = 0. Beta's R(θ) parametric outline is open at the GL poles (θ = 0/π are never nodes), so the engine appends (z = +r_north, ρ = 0) and (z = −r_south, ρ = 0) at draw time. The FoS ρ(z) profile already terminates at ρ = 0 at the tips and is drawn as-is — appending the star-convex-frame poles there would draw a spurious ρ = 0 segment (the profile is COM-centered, the poles are not; see the overlay bullet).
 - Stats quadrature calls pass `dr_dtheta` through to `surface_area`.
-- z_cm marker: red point at (z_cm, 0) on the cross-section panel (and the FoS ρ(z) panel, which shares the z axis) — the shapes are axially symmetric, so the COM lies on the z axis. Drawn from the same GL-quadrature value the stats box already shows, in the current display unit. Doubles as a visual COM check: beta with COM correction on and FoS (z-shift centering) should show it at z ≈ 0; beta with COM off shows the actual offset. Persistent artist, updated per draw — same pattern as the other engine-owned lines.
+- z_cm marker: red point at (z_cm, 0) on the cross-section panel (and the FoS ρ(z) panel, which shares the z axis) — the shapes are axially symmetric, so the COM lies on the z axis. Uses `result.z_cm`, the true-shape COM in the display frame: for beta that is the GL-quadrature z_cm of R(θ); for FoS it is 0, because the FoS shape is COM-centered by definition. Beta with COM correction off shows the actual offset; COM on and FoS show z ≈ 0. Persistent artist, updated per draw.
+- R(θ) star-convex overlay (FoS, non-zero star-convexity shift). Converting a FoS shape to R(θ) requires shifting it to a star-convex origin (`shape().z_shift`), which breaks COM-centering — z_cm(R) ≠ 0 while the true shape (the ρ(z) profile) stays COM-centered. When z_cm(R) ≠ `result.z_cm`, the engine overlays the R(θ) reconstruction *where it actually sits* (not recentered) in a distinct dashed style, with its own z_cm marker at z_cm(R), plus a legend labelling both outlines. Beta's R(θ) is itself the true shape, so the frames coincide and the overlay stays hidden. Left-panel R(θ)/dR/dθ always show the true star-convex curves.
 
 ## 9. Testing and gate
 
@@ -96,8 +97,9 @@ On invalid shapes (`status != 0`) the libraries zero-fill outputs; `dr_dtheta` a
 4. COM toggle: off ⇒ `corrected_beta10 == beta1` input; on ⇒ matches the old `radius_grid_with_com_shift` value.
 5. FoS: `z_shift`/`a2` scalars unchanged vs v0.1 (same library math, same 7201 grid); pole radii match `c + z_shift` / `|z_shift − c|`.
 6. Invalid shape: zero-filled arrays including `dr_dtheta`/poles, greyed draw path intact, no exceptions.
-7. Pole closure: drawn cross-section arrays begin/end at ρ = 0 with the analytic pole z-values.
-8. z_cm marker: point present at (z_cm, 0) on the cross-section panel; at z ≈ 0 for beta with COM on and for FoS; at the quadrature z_cm value for beta with COM off (headless draw-path check).
+7. Cross-section closure: beta's drawn outline begins/ends at ρ = 0 with the analytic pole z-values; the FoS profile is drawn as-is (already ρ = 0 at the tips — no appended poles, no spurious tip segment).
+8. z_cm marker: point present at (`result.z_cm`, 0) on the cross-section panel; at z ≈ 0 for beta with COM on and for FoS (COM-centered by definition); at the quadrature z_cm value for beta with COM off (headless draw-path check).
+10. FoS R(θ) overlay: for a non-zero star-convexity shift (asymmetric FoS), the R(θ) reconstruction is drawn where it actually sits with its own z_cm marker at z_cm(R) and a visible legend; hidden for symmetric FoS and for beta (frames coincide).
 9. Existing perf tests re-run: per-drag work is dot products; 2048-point lines vs 721 is negligible for matplotlib. No perf regression vs the engine v0.2 baselines.
 
 Gate: `main.py beta` and `main.py fos` under WSLg; saved PNGs for known shapes spot-checked against v0.1 output (shapes visually identical; vol factor differs only in trailing digits).
