@@ -62,6 +62,9 @@ class FoSRender:
                     depth = neck_depth(prof.rho, *hit)
                 neck_info = NeckInfo(z=nk.z_neck, rho=nk.rho_neck,
                                      depth=depth, source="lib")
+        # The FoS shape is COM-centered by definition (rho_profile is the COM
+        # frame). The R(θ) representation carries the star-convexity shift, so its
+        # own COM is offset — the engine draws that overlay separately.
         return ShapeResult(
             status=status, status_name=status_name, message=message,
             theta=nodes.THETA, radius=radii,
@@ -69,7 +72,7 @@ class FoSRender:
             neck=neck_info,
             scalars={"z_shift": shp.z_shift, "a2": fp.a2(arr)},
             length_keys=frozenset({"z_shift"}),
-            dr_dtheta=dr_dtheta, r_north=shp.r_north, r_south=shp.r_south)
+            dr_dtheta=dr_dtheta, r_north=shp.r_north, r_south=shp.r_south, z_cm=0.0)
 
     def filename(self, z: int, n: int, params: dict[str, float]) -> str:
         return (f"fos_shape_Z{z}_N{n}_c{params['c']:.2f}"

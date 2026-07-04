@@ -10,7 +10,7 @@ from __future__ import annotations
 import numpy as np
 import beta_parameterization as bp
 
-from src.core import nodes
+from src.core import nodes, quadrature
 from src.core.neck import find_neck_indices, neck_depth
 from src.core.result import NeckInfo, ShapeResult, SliderSpec, ToggleSpec
 
@@ -55,10 +55,13 @@ class BetaRender:
             dr_dtheta = rd.dr_dtheta * vol_factor
             r_north = resolved.r_north * vol_factor
             r_south = resolved.r_south * vol_factor
+            # Beta's R(θ) is the true shape; its COM sits on the z axis at z_cm
+            # (nonzero when COM correction is off — the marker shows the offset).
+            z_cm = quadrature.z_cm(nodes.THETA, radii)
         else:
             radii = np.zeros(nodes.N_NODES)
             dr_dtheta = np.zeros(nodes.N_NODES)
-            r_north = r_south = 0.0
+            r_north = r_south = z_cm = 0.0
 
         z = radii * nodes.X
         rho = radii * nodes.SIN_THETA
@@ -79,7 +82,7 @@ class BetaRender:
             message=primary.message,
             theta=nodes.THETA, radius=radii, z=z, rho=rho, drho_dz=None,
             neck=neck, scalars=scalars, length_keys=frozenset(),
-            dr_dtheta=dr_dtheta, r_north=r_north, r_south=r_south)
+            dr_dtheta=dr_dtheta, r_north=r_north, r_south=r_south, z_cm=z_cm)
 
     def filename(self, z: int, n: int, params: dict[str, float]) -> str:
         betas = "_".join(f"{params[f'beta{i}']:.2f}" for i in range(1, N_BETAS + 1))

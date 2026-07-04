@@ -23,6 +23,7 @@ def test_sphere(render: FoSRender) -> None:
     assert np.allclose(res.dr_dtheta, 0.0, atol=1e-9)
     assert res.r_north == pytest.approx(1.0, abs=1e-14)
     assert res.r_south == pytest.approx(1.0, abs=1e-14)
+    assert res.z_cm == 0.0                                 # FoS shape is COM-centered
     assert res.scalars["z_shift"] == pytest.approx(0.0, abs=1e-14)
     assert res.scalars["a2"] == pytest.approx(0.0, abs=1e-14)
     assert "z_shift" in res.length_keys
@@ -37,6 +38,7 @@ def test_pole_radii_formula(render: FoSRender) -> None:
     zs, c = res.scalars["z_shift"], NECKED["c"]
     assert res.r_north == pytest.approx(c + zs, abs=1e-12)
     assert res.r_south == pytest.approx(abs(zs - c), abs=1e-12)
+    assert res.z_cm == 0.0                                 # true shape COM-centered
 
 
 def test_dr_dtheta_matches_gradient(render: FoSRender) -> None:

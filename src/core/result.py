@@ -63,6 +63,7 @@ class ShapeResult:
     dr_dtheta: Array                 # lib-exact analytic dR/dθ, scaled like radius
     r_north: float                   # analytic R(0), R0 units, scaled like radius
     r_south: float                   # analytic R(pi), R0 units, scaled like radius
+    z_cm: float                      # true-shape COM in the cross-section frame, R0 units
 
     @property
     def ok(self) -> bool:

@@ -149,3 +149,43 @@ def test_stats_labeled_gl(app) -> None:
     text = app.stats_text.get_text()
     assert "(GL)" in text
     assert "(py quad)" not in text
+
+
+def test_fos_rtheta_overlay_when_star_convex_shift() -> None:
+    a = ShapePlotterApp(FoSRender())
+    a.rows["c"].slider.set_val(2.0)
+    a.rows["a3"].slider.set_val(0.2)
+    a.rows["a4"].slider.set_val(0.6)                     # asymmetric -> shift != 0
+    assert a.last_result.ok
+    # True shape is COM-centered; its red marker sits at the origin.
+    assert a.zcm_point.get_xdata()[0] == pytest.approx(0.0, abs=1e-9)
+    # R(θ) representation drawn where it actually sits, with its own marker.
+    assert a.rtheta_upper.get_visible() and a.rtheta_zcm.get_visible()
+    assert abs(a.rtheta_zcm.get_xdata()[0]) > 0.1        # clearly offset (fm)
+    ry = a.rtheta_upper.get_ydata()
+    assert ry[0] == 0.0 and ry[-1] == 0.0                # overlay closes at rho = 0
+    import matplotlib.pyplot as plt
+    plt.close(a.fig)
+
+
+def test_no_rtheta_overlay_for_symmetric_fos() -> None:
+    a = ShapePlotterApp(FoSRender())
+    a.rows["c"].slider.set_val(2.0)
+    a.rows["a4"].slider.set_val(0.6)                     # symmetric -> shift == 0
+    assert a.last_result.ok
+    assert not a.rtheta_upper.get_visible()
+    assert not a.rtheta_zcm.get_visible()
+    import matplotlib.pyplot as plt
+    plt.close(a.fig)
+
+
+def test_no_rtheta_overlay_for_beta() -> None:
+    a = ShapePlotterApp(BetaRender())
+    a.rows["beta2"].slider.set_val(1.5)
+    a.rows["beta3"].slider.set_val(0.4)                  # asymmetric beta, COM off
+    assert a.last_result.ok
+    # Beta's R(θ) is the true shape: no separate representation to overlay.
+    assert not a.rtheta_upper.get_visible()
+    assert not a.rtheta_zcm.get_visible()
+    import matplotlib.pyplot as plt
+    plt.close(a.fig)

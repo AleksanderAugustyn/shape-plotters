@@ -25,6 +25,7 @@ R0_FM = 1.16
 VALID_COLOR = "tab:blue"
 DERIV_COLOR = "tab:red"
 NECK_COLOR = "tab:green"
+RTHETA_COLOR = "tab:orange"   # R(θ) star-convex representation (FoS shifted shapes)
 INVALID_COLOR = "0.55"
 UNITS_LABEL = "fm units"
 
@@ -84,6 +85,15 @@ class ShapePlotterApp:
         # z_cm marker: red point on the z axis (COM of an axially symmetric shape).
         (self.zcm_point,) = ax.plot([], [], marker="o", ms=6, ls="",
                                     color="tab:red", zorder=5)
+        # R(θ) star-convex representation, drawn where it actually sits (offset
+        # from the true shape) for FoS shapes with a non-zero star-convexity
+        # shift; carries its own z_cm marker. Hidden otherwise.
+        (self.rtheta_upper,) = ax.plot([], [], color=RTHETA_COLOR, lw=1.2, ls="--",
+                                       alpha=0.9, visible=False)
+        (self.rtheta_lower,) = ax.plot([], [], color=RTHETA_COLOR, lw=1.2, ls="--",
+                                       alpha=0.9, visible=False)
+        (self.rtheta_zcm,) = ax.plot([], [], marker="o", ms=6, ls="",
+                                     color=RTHETA_COLOR, zorder=5, visible=False)
         self.scission_bands = [
             ax.axhspan(SCISSION_BAND_FM[0], SCISSION_BAND_FM[1],
                        color=NECK_COLOR, alpha=0.15, visible=False),
@@ -228,11 +238,15 @@ class ShapePlotterApp:
         self.dr_line.set_data(result.theta, result.dr_dtheta * scale)
 
         z, rho = result.z * scale, result.rho * scale
-        # GL nodes exclude theta = 0/pi; close the outline with the analytic poles.
         rn, rs = result.r_north * scale, result.r_south * scale
-        first, last = (-rs, rn) if (z.size > 1 and z[0] < z[-1]) else (rn, -rs)
-        z_c = np.concatenate(([first], z, [last]))
-        rho_c = np.concatenate(([0.0], rho, [0.0]))
+        # Beta's R(θ) parametric outline is open at the GL poles → append the
+        # analytic poles; the FoS ρ(z) profile already ends at ρ=0 → draw as-is.
+        if rho.size > 1 and max(abs(float(rho[0])), abs(float(rho[-1]))) > 1e-9:
+            first, last = (-rs, rn) if z[0] < z[-1] else (rn, -rs)
+            z_c = np.concatenate(([first], z, [last]))
+            rho_c = np.concatenate(([0.0], rho, [0.0]))
+        else:
+            z_c, rho_c = z, rho
         self.shape_upper.set_data(z_c, rho_c)
         self.shape_lower.set_data(z_c, -rho_c)
         if result.neck is not None:
@@ -258,12 +272,30 @@ class ShapePlotterApp:
 
         v = quadrature.volume(result.theta, result.radius) * scale**3
         s = quadrature.surface_area(result.theta, result.radius, result.dr_dtheta) * scale**2
-        zc = quadrature.z_cm(result.theta, result.radius) * scale
+        zc = result.z_cm * scale                      # true-shape COM (display frame)
         self.zcm_point.set_data([zc], [0.0])
         self.zcm_point.set_visible(result.ok)
         if self.zcm_extra is not None:
             self.zcm_extra.set_data([zc], [0.0])
             self.zcm_extra.set_visible(result.ok)
+
+        # When the star-convexity shift puts R(θ) in a different frame than the
+        # true shape (FoS with a3/a5/a7 ≠ 0), draw R(θ) where it actually sits,
+        # with its own z_cm marker at z_cm(R). Beta's R(θ) IS the true shape, so
+        # the two frames coincide and this overlay stays hidden.
+        zc_r = quadrature.z_cm(result.theta, result.radius) * scale
+        show_rtheta = bool(result.ok and abs(zc_r - zc) > 1e-6 * (1.0 + abs(zc)))
+        if show_rtheta:
+            zr = result.radius * np.cos(result.theta) * scale
+            rr = result.radius * np.sin(result.theta) * scale
+            first, last = (-rs, rn) if zr[0] < zr[-1] else (rn, -rs)
+            zr = np.concatenate(([first], zr, [last]))
+            rr = np.concatenate(([0.0], rr, [0.0]))
+            self.rtheta_upper.set_data(zr, rr)
+            self.rtheta_lower.set_data(zr, -rr)
+            self.rtheta_zcm.set_data([zc_r], [0.0])
+        for art in (self.rtheta_upper, self.rtheta_lower, self.rtheta_zcm):
+            art.set_visible(show_rtheta)
 
         self.stats_text.set_text(self._stats_block(result, scale, unit, v, s, zc))
 

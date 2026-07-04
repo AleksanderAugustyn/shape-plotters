@@ -27,6 +27,7 @@ def test_sphere(render: BetaRender) -> None:
     assert np.allclose(res.dr_dtheta, 0.0, atol=1e-9)
     assert res.r_north == pytest.approx(1.0, abs=1e-12)
     assert res.r_south == pytest.approx(1.0, abs=1e-12)
+    assert res.z_cm == pytest.approx(0.0, abs=1e-9)        # sphere COM at origin
     assert res.scalars["vol_factor"] == pytest.approx(1.0, abs=1e-12)
     assert res.neck is None
     assert res.drho_dz is None
@@ -64,6 +65,8 @@ def test_com_toggle(render: BetaRender) -> None:
     assert off.ok and on.ok
     assert off.scalars["corrected_beta10"] == 0.0                  # input beta1
     assert on.scalars["corrected_beta10"] != 0.0                   # COM moved it
+    assert abs(off.z_cm) > 1e-3                                    # off-axis COM, COM off
+    assert on.z_cm == pytest.approx(0.0, abs=1e-4)                 # COM correction centers it
     # Legacy-API parity (test-only usage; updated when the 2.3.0 cleanup lands):
     ref = render._cache.radius_grid_with_com_shift([0.0, 0.85, 0.35, 0.18])
     assert on.scalars["corrected_beta10"] == pytest.approx(ref.corrected_beta10, abs=1e-14)
