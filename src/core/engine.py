@@ -75,7 +75,7 @@ class ShapePlotterApp:
                                   label="dR/dθ (lib)")
         ax.set_xlim(0.0, np.pi)  # also disables x-autoscale on this axes
         ax.set_xlabel("θ [rad]")
-        self.radius_legend = ax.legend(loc="upper center", fontsize=8)
+        self.radius_legend = ax.legend(loc="upper center", fontsize=12)
         ax.grid(alpha=0.3)
 
         ax = self.ax_shape
@@ -85,16 +85,19 @@ class ShapePlotterApp:
         # z_cm marker: red point on the z axis (COM of an axially symmetric shape).
         (self.zcm_point,) = ax.plot([], [], marker="o", ms=6, ls="",
                                     color="tab:red", zorder=5, label="z_cm")
-        # R(θ) star-convex representation, drawn where it actually sits (offset
-        # from the true shape) for FoS shapes with a non-zero star-convexity
-        # shift; carries its own z_cm marker. Hidden otherwise.
+        # Orange dashed overlay. Two sources share these artists (a render only
+        # ever drives one): the FoS R(θ) star-convex representation drawn where
+        # it actually sits, or a render-supplied outline (beta's COM-corrected
+        # shape). Labels come from the render so each names its own overlay.
+        ov_label = getattr(self.render, "overlay_label", "R(θ) star-convex")
+        ov_zcm_label = getattr(self.render, "overlay_zcm_label", "z_cm (R(θ))")
         (self.rtheta_upper,) = ax.plot([], [], color=RTHETA_COLOR, lw=1.2, ls="--",
-                                       alpha=0.9, visible=False, label="R(θ) star-convex")
+                                       alpha=0.9, visible=False, label=ov_label)
         (self.rtheta_lower,) = ax.plot([], [], color=RTHETA_COLOR, lw=1.2, ls="--",
                                        alpha=0.9, visible=False)
         (self.rtheta_zcm,) = ax.plot([], [], marker="o", ms=6, ls="",
                                      color=RTHETA_COLOR, zorder=5, visible=False,
-                                     label="z_cm (R(θ))")
+                                     label=ov_zcm_label)
         self.scission_bands = [
             ax.axhspan(SCISSION_BAND_FM[0], SCISSION_BAND_FM[1],
                        color=NECK_COLOR, alpha=0.15, visible=False),
@@ -107,7 +110,7 @@ class ShapePlotterApp:
         ax.grid(alpha=0.3)
         # Distinguishes the true shape from the R(θ) overlay; built once and only
         # shown while the overlay is active (update() toggles visibility).
-        self.shape_legend = ax.legend(loc="upper right", fontsize=7)
+        self.shape_legend = ax.legend(loc="upper right", fontsize=12)
         self.shape_legend.set_visible(False)
 
         self.extra_legend = None
@@ -121,11 +124,11 @@ class ShapePlotterApp:
             (self.zcm_extra,) = ax.plot([], [], marker="o", ms=6, ls="",
                                         color="tab:red", zorder=5)
             ax.set_xlabel(f"z [{unit}]")
-            self.extra_legend = ax.legend(loc="upper center", fontsize=8)
+            self.extra_legend = ax.legend(loc="upper center", fontsize=12)
             ax.grid(alpha=0.3)
 
         self.stats_text = self.ax_stats.text(
-            0.0, 1.0, "", va="top", family="monospace", fontsize=9,
+            0.0, 1.0, "", va="top", family="monospace", fontsize=12,
             transform=self.ax_stats.transAxes)
 
     def _build_widgets(self) -> None:
@@ -273,7 +276,7 @@ class ShapePlotterApp:
         self._apply_validity(result.ok)
         title = "" if result.ok else f"{result.status_name}: {result.message}"
         if self.ax_shape.get_title() != title:
-            self.ax_shape.set_title(title, color="tab:red", fontsize=9)
+            self.ax_shape.set_title(title, color="tab:red", fontsize=12)
 
         v = quadrature.volume(result.theta, result.radius) * scale**3
         s = quadrature.surface_area(result.theta, result.radius, result.dr_dtheta) * scale**2
@@ -284,21 +287,30 @@ class ShapePlotterApp:
             self.zcm_extra.set_data([zc], [0.0])
             self.zcm_extra.set_visible(result.ok)
 
-        # When the star-convexity shift puts R(θ) in a different frame than the
-        # true shape (FoS with a3/a5/a7 ≠ 0), draw R(θ) where it actually sits,
-        # with its own z_cm marker at z_cm(R). Beta's R(θ) IS the true shape, so
-        # the two frames coincide and this overlay stays hidden.
-        zc_r = quadrature.z_cm(result.theta, result.radius) * scale
-        show_rtheta = bool(result.ok and abs(zc_r - zc) > 1e-6 * (1.0 + abs(zc)))
-        if show_rtheta:
-            zr = result.radius * np.cos(result.theta) * scale
-            rr = result.radius * np.sin(result.theta) * scale
-            first, last = (-rs, rn) if zr[0] < zr[-1] else (rn, -rs)
-            zr = np.concatenate(([first], zr, [last]))
-            rr = np.concatenate(([0.0], rr, [0.0]))
-            self.rtheta_upper.set_data(zr, rr)
-            self.rtheta_lower.set_data(zr, -rr)
-            self.rtheta_zcm.set_data([zc_r], [0.0])
+        # Orange overlay on the cross-section. A render may supply the outline
+        # directly (beta's COM-corrected shape, pre-closed at the poles); else
+        # the engine infers the FoS R(θ) star-convex representation and draws it
+        # where it actually sits, shown only when its COM differs from the true
+        # shape's (FoS with a3/a5/a7 ≠ 0). Beta's R(θ) IS the true shape, so that
+        # inference never fires for beta.
+        if result.overlay_z is not None:
+            show_rtheta = bool(result.ok)
+            if show_rtheta:
+                self.rtheta_upper.set_data(result.overlay_z * scale, result.overlay_rho * scale)
+                self.rtheta_lower.set_data(result.overlay_z * scale, -result.overlay_rho * scale)
+                self.rtheta_zcm.set_data([result.overlay_z_cm * scale], [0.0])
+        else:
+            zc_r = quadrature.z_cm(result.theta, result.radius) * scale
+            show_rtheta = bool(result.ok and abs(zc_r - zc) > 1e-6 * (1.0 + abs(zc)))
+            if show_rtheta:
+                zr = result.radius * np.cos(result.theta) * scale
+                rr = result.radius * np.sin(result.theta) * scale
+                first, last = (-rs, rn) if zr[0] < zr[-1] else (rn, -rs)
+                zr = np.concatenate(([first], zr, [last]))
+                rr = np.concatenate(([0.0], rr, [0.0]))
+                self.rtheta_upper.set_data(zr, rr)
+                self.rtheta_lower.set_data(zr, -rr)
+                self.rtheta_zcm.set_data([zc_r], [0.0])
         for art in (self.rtheta_upper, self.rtheta_lower, self.rtheta_zcm):
             art.set_visible(show_rtheta)
         self.shape_legend.set_visible(show_rtheta)

@@ -56,20 +56,31 @@ def test_dr_dtheta_is_exact_not_gradient(render: BetaRender) -> None:
     assert float(np.max(np.abs(res.dr_dtheta[1:-1] - fd[1:-1]))) < tol
 
 
-def test_com_toggle(render: BetaRender) -> None:
-    # Asymmetric shape proven lib-VALID in v0.1 (beta1 input is 0.0, so the
-    # COM iteration must move corrected_beta10 away from 0).
+def test_com_corrected_overlay(render: BetaRender) -> None:
+    # Asymmetric shape proven lib-VALID in v0.1 (beta1 input is 0.0, so the COM
+    # iteration moves corrected_beta10 away from 0). The default shape keeps its
+    # off-axis COM; the COM-corrected overlay recenters it.
     p = _params([0.0, 0.85, 0.35, 0.18])
-    off = render.compute(p, {"com": False})
-    on = render.compute(p, {"com": True})
-    assert off.ok and on.ok
-    assert off.scalars["corrected_beta10"] == 0.0                  # input beta1
-    assert on.scalars["corrected_beta10"] != 0.0                   # COM moved it
-    assert abs(off.z_cm) > 1e-3                                    # off-axis COM, COM off
-    assert on.z_cm == pytest.approx(0.0, abs=1e-4)                 # COM correction centers it
+    res = render.compute(p, {})
+    assert res.ok
+    assert abs(res.z_cm) > 1e-3                                    # slider shape COM off axis
+    assert res.scalars["corrected_beta10"] != 0.0                 # centering dipole
+    # Overlay outline present, closed at rho = 0, and its own COM centered.
+    assert res.overlay_z is not None and res.overlay_rho is not None
+    assert res.overlay_rho[0] == 0.0 and res.overlay_rho[-1] == 0.0
+    assert res.overlay_z_cm == pytest.approx(0.0, abs=1e-4)
     # Legacy-API parity (test-only usage; updated when the 2.3.0 cleanup lands):
     ref = render._cache.radius_grid_with_com_shift([0.0, 0.85, 0.35, 0.18])
-    assert on.scalars["corrected_beta10"] == pytest.approx(ref.corrected_beta10, abs=1e-14)
+    assert res.scalars["corrected_beta10"] == pytest.approx(ref.corrected_beta10, abs=1e-14)
+
+
+def test_no_overlay_when_symmetric(render: BetaRender) -> None:
+    # Even multipoles only: the COM is already centered, so corrected_beta10 ~ 0
+    # and the overlay is suppressed.
+    res = render.compute(_params([0.0, 0.30, 0.0, 0.10]), {})
+    assert res.ok
+    assert abs(res.scalars["corrected_beta10"]) <= 1e-3
+    assert res.overlay_z is None
 
 
 def test_pole_radii_scaled_with_volume_factor(render: BetaRender) -> None:

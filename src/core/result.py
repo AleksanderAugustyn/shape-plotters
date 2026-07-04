@@ -64,6 +64,11 @@ class ShapeResult:
     r_north: float                   # analytic R(0), R0 units, scaled like radius
     r_south: float                   # analytic R(pi), R0 units, scaled like radius
     z_cm: float                      # true-shape COM in the cross-section frame, R0 units
+    # Optional orange cross-section overlay (beta's COM-corrected shape).
+    # Pre-closed cartesian outline in R0 units; the engine draws it when set.
+    overlay_z: Array | None = None
+    overlay_rho: Array | None = None
+    overlay_z_cm: float = 0.0
 
     @property
     def ok(self) -> bool:

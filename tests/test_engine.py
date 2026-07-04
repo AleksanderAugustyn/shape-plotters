@@ -119,9 +119,14 @@ def test_zcm_marker_tracks_com() -> None:
     assert a.zcm_point.get_ydata()[0] == 0.0             # point sits on the z axis
     assert a.zcm_point.get_xdata()[0] == pytest.approx(0.0, abs=1e-9)   # sphere
     a.rows["beta3"].slider.set_val(0.4)                  # octupole asymmetry, COM off
-    assert abs(a.zcm_point.get_xdata()[0]) > 0.01        # clear offset (fm), COM off
-    a._on_check("COM correction")                        # COM on -> back to ~0
-    assert a.zcm_point.get_xdata()[0] == pytest.approx(0.0, abs=1e-4)
+    # Slider shape keeps its off-axis COM (red marker); the orange COM-corrected
+    # overlay appears with its own marker recentered on the origin.
+    assert abs(a.zcm_point.get_xdata()[0]) > 0.01        # slider shape offset (fm)
+    assert a.rtheta_upper.get_visible() and a.rtheta_zcm.get_visible()
+    assert a.shape_legend.get_visible()
+    assert a.rtheta_zcm.get_xdata()[0] == pytest.approx(0.0, abs=1e-4)   # corrected COM centered
+    ry = a.rtheta_upper.get_ydata()
+    assert ry[0] == 0.0 and ry[-1] == 0.0                # overlay closes at rho = 0
     import matplotlib.pyplot as plt
     plt.close(a.fig)
 
@@ -181,14 +186,29 @@ def test_no_rtheta_overlay_for_symmetric_fos() -> None:
     plt.close(a.fig)
 
 
-def test_no_rtheta_overlay_for_beta() -> None:
+def test_no_beta_overlay_when_symmetric() -> None:
     a = ShapePlotterApp(BetaRender())
-    a.rows["beta2"].slider.set_val(1.5)
-    a.rows["beta3"].slider.set_val(0.4)                  # asymmetric beta, COM off
+    a.rows["beta2"].slider.set_val(1.5)                  # even multipole only -> COM centered
     assert a.last_result.ok
-    # Beta's R(θ) is the true shape: no separate representation to overlay.
+    # Symmetric betas: corrected_beta10 ~ 0, so the COM-corrected overlay is
+    # suppressed (it would coincide with the slider shape).
+    assert a.last_result.overlay_z is None
     assert not a.rtheta_upper.get_visible()
     assert not a.rtheta_zcm.get_visible()
     assert not a.shape_legend.get_visible()
+    import matplotlib.pyplot as plt
+    plt.close(a.fig)
+
+
+def test_beta_com_overlay_when_asymmetric() -> None:
+    a = ShapePlotterApp(BetaRender())
+    a.rows["beta2"].slider.set_val(1.5)
+    a.rows["beta3"].slider.set_val(0.4)                  # asymmetric beta -> COM off axis
+    assert a.last_result.ok
+    # Slider shape's COM is off axis; the COM-corrected overlay is drawn orange.
+    assert a.last_result.overlay_z is not None
+    assert a.rtheta_upper.get_visible() and a.rtheta_zcm.get_visible()
+    assert a.shape_legend.get_visible()
+    assert a.rtheta_zcm.get_xdata()[0] == pytest.approx(0.0, abs=1e-4)
     import matplotlib.pyplot as plt
     plt.close(a.fig)
