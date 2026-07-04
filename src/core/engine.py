@@ -288,7 +288,7 @@ class ShapePlotterApp:
                       f"  ρ = {result.neck.rho * scale:.4f} {unit}",
                       f"  depth = {result.neck.depth:.3f}"]
         v = quadrature.volume(result.theta, result.radius) * scale**3
-        s = quadrature.surface_area(result.theta, result.radius) * scale**2
+        s = quadrature.surface_area(result.theta, result.radius, result.dr_dtheta) * scale**2
         zc = quadrature.z_cm(result.theta, result.radius) * scale
         lines += ["", f"volume  = {v:.4f} {unit}³ (py quad)",
                   f"surface = {s:.4f} {unit}² (py quad)",

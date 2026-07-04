@@ -39,7 +39,7 @@ def test_volume_fix_matches_wmmm_and_old_plotter(render: BetaRender) -> None:
     assert res.ok
     assert res.scalars["vol_factor"] == pytest.approx(0.99598851, abs=1e-5)
     assert quadrature.volume(res.theta, res.radius) == pytest.approx(
-        4.0 * np.pi / 3.0, rel=1e-5)   # trapezoid until Task 6 tightens to 1e-12
+        4.0 * np.pi / 3.0, rel=1e-12)   # GL volume factor makes this exact
 
 
 def test_dr_dtheta_is_exact_not_gradient(render: BetaRender) -> None:

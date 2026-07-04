@@ -1,32 +1,41 @@
-"""Python-quadrature shape integrals — labeled v1 stopgap until the libraries
-expose volume/surface/z_cm natively (umbrella spec non-goal)."""
+"""GL dot-product shape integrals on the shared node set (src/core/nodes.py).
+
+Spectrally exact — the same scheme as WMMM's dense set: every integrand
+carries a sin(theta) factor that the x = cos(theta) substitution absorbs.
+Arrays must be sampled on nodes.THETA; theta is accepted for interface
+stability and checked against the node set.
+"""
 from __future__ import annotations
 
 import numpy as np
 
-from .result import Array
+from src.core import nodes
+from src.core.result import Array
+
+
+def _require_node_set(theta: Array) -> None:
+    if theta.shape != nodes.THETA.shape:
+        raise ValueError(
+            f"expected the shared GL node set ({nodes.N_NODES} nodes), got {theta.shape}")
 
 
 def volume(theta: Array, radius: Array) -> float:
-    """V = (2*pi/3) * integral R^3 sin(theta) dtheta (star-convex body)."""
-    return float((2.0 * np.pi / 3.0) * np.trapezoid(radius**3 * np.sin(theta), theta))
+    """V = (2*pi/3) * sum w_i R_i^3 (star-convex body)."""
+    _require_node_set(theta)
+    return float((2.0 * np.pi / 3.0) * np.sum(nodes.W * radius**3))
 
 
-def surface_area(theta: Array, radius: Array) -> float:
-    """S = 2*pi * integral R sin(theta) sqrt(R^2 + R'^2) dtheta.
-
-    R' comes from np.gradient — display-grade precision, consistent with the
-    plotted dR/dtheta.
-    """
-    dr = np.gradient(radius, theta)
-    return float(2.0 * np.pi * np.trapezoid(
-        radius * np.sin(theta) * np.sqrt(radius**2 + dr**2), theta))
+def surface_area(theta: Array, radius: Array, dr_dtheta: Array) -> float:
+    """S = 2*pi * sum w_i R_i sqrt(R_i^2 + R'_i^2), with lib-exact R'."""
+    _require_node_set(theta)
+    return float(2.0 * np.pi * np.sum(
+        nodes.W * radius * np.sqrt(radius**2 + dr_dtheta**2)))
 
 
 def z_cm(theta: Array, radius: Array) -> float:
-    """z_cm = (pi/2) * integral R^4 sin(theta) cos(theta) dtheta / V; 0 if V <= 0."""
+    """z_cm = (pi/2) * sum w_i R_i^4 x_i / V; 0 if V <= 0."""
+    _require_node_set(theta)
     v = volume(theta, radius)
     if v <= 0.0:
         return 0.0
-    return float((np.pi / 2.0) * np.trapezoid(
-        radius**4 * np.sin(theta) * np.cos(theta), theta) / v)
+    return float((np.pi / 2.0) * np.sum(nodes.W * radius**4 * nodes.X) / v)
