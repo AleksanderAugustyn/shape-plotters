@@ -47,7 +47,7 @@ class BetaRender:
 
         vol_factor = 1.0
         if ok:
-            # WMMM's exact GL volume factor (radius_grid_mod original_volume_factor):
+            # WMMM's exact GL volume factor (the library's original_volume_factor):
             # radii arrive pre-scaled everywhere — derivative and poles included.
             raw_volume = (2.0 * np.pi / 3.0) * float(np.sum(nodes.W * rd.radii**3))
             vol_factor = float((SPHERE_VOLUME / raw_volume) ** (1.0 / 3.0))

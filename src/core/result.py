@@ -52,7 +52,7 @@ class ShapeResult:
     status: int                    # 0 = valid; engine greys the plot otherwise
     status_name: str               # symbolic name from the package Status IntEnum
     message: str
-    theta: Array                   # theta grid over [0, pi]
+    theta: Array                   # shared GL node set (src/core/nodes.py)
     radius: Array                  # R(theta), R0 units
     z: Array                       # profile axis, R0 units
     rho: Array                     # rho(z), R0 units
@@ -60,10 +60,9 @@ class ShapeResult:
     neck: NeckInfo | None
     scalars: dict[str, float]      # lib-native, R0 units where dimensional
     length_keys: frozenset[str]    # which scalars scale with the fm toggle
-    # GL-native additions (defaults dropped once both renders fill them):
-    dr_dtheta: Array | None = None   # lib-exact analytic dR/dθ, scaled like radius
-    r_north: float = 0.0             # analytic R(0), R0 units, scaled like radius
-    r_south: float = 0.0             # analytic R(pi), R0 units, scaled like radius
+    dr_dtheta: Array                 # lib-exact analytic dR/dθ, scaled like radius
+    r_north: float                   # analytic R(0), R0 units, scaled like radius
+    r_south: float                   # analytic R(pi), R0 units, scaled like radius
 
     @property
     def ok(self) -> bool:
