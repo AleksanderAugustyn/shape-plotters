@@ -10,6 +10,8 @@ A render must expose:
     has_extra_panel: bool                # True -> engine draws rho(z) + drho_dz panel
     compute(params: dict[str, float], toggles: dict[str, bool]) -> ShapeResult
     filename(z: int, n: int, params: dict[str, float]) -> str
+    energy_requests(params: dict[str, float], result: ShapeResult)
+        -> list[EnergyRequest]           # WMMM computations for this shape(s)
 """
 from __future__ import annotations
 
@@ -37,6 +39,20 @@ class ToggleSpec:
     key: str
     label: str
     default: bool
+
+
+@dataclass(frozen=True)
+class EnergyRequest:
+    """One WMMM point computation the engine should run on an Energy click.
+
+    Renders own the physics semantics (how many shapes are on screen and in
+    which parameter convention); the engine just iterates requests. Carries
+    no wmmm dependency — src/core/energy.py resolves it.
+    """
+    label: str                 # stats-block header; mirrors the plot legend
+    param_type: str            # "legendre" | "fos"
+    shape: tuple[float, ...]   # raw slider values in WMMM's convention
+    com_correction: bool       # WMMM's beta_10_com_shift flag
 
 
 @dataclass(frozen=True)

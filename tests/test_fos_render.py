@@ -73,3 +73,14 @@ def test_slider_specs_and_filename(render: FoSRender) -> None:
     assert render.has_extra_panel is True
     name = render.filename(92, 144, {**SPHERE, "c": 1.2, "a3": 0.17})
     assert name == "fos_shape_Z92_N144_c1.20_a30.17_a40.00_a50.00_a60.00_a70.00_a80.00.png"
+
+
+def test_energy_requests_always_single() -> None:
+    from src.renders.fos import FoSRender
+    render = FoSRender()
+    p = dict(c=2.0, a3=0.2, a4=0.6, a5=0.0, a6=0.0, a7=0.0, a8=0.0)
+    res = render.compute(p, {})
+    assert res.ok
+    (req,) = render.energy_requests(p, res)
+    assert (req.label, req.param_type, req.com_correction) == ("FoS", "fos", True)
+    assert req.shape == (2.0, 0.2, 0.6, 0.0, 0.0, 0.0, 0.0)

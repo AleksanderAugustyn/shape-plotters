@@ -13,7 +13,7 @@ import fos_parameterization as fp
 
 from src.core import nodes
 from src.core.neck import find_neck_indices, neck_depth
-from src.core.result import NeckInfo, ShapeResult, SliderSpec, ToggleSpec
+from src.core.result import EnergyRequest, NeckInfo, ShapeResult, SliderSpec, ToggleSpec
 
 # rho(z) display-panel resolution (native COM-frame profile) — a display
 # choice, not a calculation grid: the GL theta-nodes sample the star-convex
@@ -81,3 +81,11 @@ class FoSRender:
         return (f"fos_shape_Z{z}_N{n}_c{params['c']:.2f}"
                 + "".join(f"_a{i}{params[f'a{i}']:.2f}" for i in range(3, 9))
                 + ".png")
+
+    def energy_requests(self, params: dict[str, float],
+                        result: ShapeResult) -> list[EnergyRequest]:
+        """One request — the FoS dashed overlay is a reframing of the same
+        shape, not a second shape; com_correction is inert on the FoS path."""
+        return [EnergyRequest("FoS", "fos",
+                              tuple(params[k] for k in PARAM_KEYS),
+                              com_correction=True)]

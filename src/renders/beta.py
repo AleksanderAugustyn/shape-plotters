@@ -19,9 +19,11 @@ import beta_parameterization as bp
 
 from src.core import nodes, quadrature
 from src.core.neck import find_neck_indices, neck_depth
-from src.core.result import NeckInfo, ShapeResult, SliderSpec
+from src.core.result import EnergyRequest, NeckInfo, ShapeResult, SliderSpec
 
 N_BETAS = 8
+# WMMM's legendre parameterization takes 20 betas; sliders drive the first 8.
+WMMM_N_LEGENDRE_PARAMS = 20
 SPHERE_VOLUME = 4.0 * np.pi / 3.0  # unit sphere, R0 units
 # The COM-corrected shape coincides with the slider shape when the corrected
 # dipole equals the slider beta1 (beta10 is a shape parameter, not a
@@ -138,3 +140,16 @@ class BetaRender:
     def filename(self, z: int, n: int, params: dict[str, float]) -> str:
         betas = "_".join(f"{params[f'beta{i}']:.2f}" for i in range(1, N_BETAS + 1))
         return f"{z}_{n}_{betas}.png"
+
+    def energy_requests(self, params: dict[str, float],
+                        result: ShapeResult) -> list[EnergyRequest]:
+        """WMMM requests: the slider (blue) shape, plus the COM-corrected
+        (orange) shape when the overlay is on screen. WMMM recomputes beta10
+        itself under com_correction=True, so both carry the same betas."""
+        shape = tuple(params[f"beta{i}"] for i in range(1, N_BETAS + 1)) \
+            + (0.0,) * (WMMM_N_LEGENDRE_PARAMS - N_BETAS)
+        requests = [EnergyRequest("slider", "legendre", shape, com_correction=False)]
+        if result.overlay_z is not None:
+            requests.append(
+                EnergyRequest("COM corrected", "legendre", shape, com_correction=True))
+        return requests

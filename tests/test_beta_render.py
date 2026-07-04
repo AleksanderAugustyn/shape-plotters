@@ -140,3 +140,24 @@ def test_slider_specs_and_filename(render: BetaRender) -> None:
     assert render.has_extra_panel is False
     name = render.filename(92, 144, _params([0.0, 1.25]))
     assert name == "92_144_0.00_1.25_0.00_0.00_0.00_0.00_0.00_0.00.png"
+
+
+def test_energy_requests_single_without_overlay(render: BetaRender) -> None:
+    p = _params([0.0, 0.30])
+    res = render.compute(p, {})
+    assert res.overlay_z is None
+    (req,) = render.energy_requests(p, res)
+    assert (req.label, req.param_type, req.com_correction) == ("slider", "legendre", False)
+    assert len(req.shape) == 20                      # WMMM's legendre width
+    assert req.shape[:8] == (0.0, 0.30, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
+    assert req.shape[8:] == (0.0,) * 12              # zero-padded tail
+
+
+def test_energy_requests_both_with_overlay(render: BetaRender) -> None:
+    p = _params([0.0, 0.85, 0.35, 0.18])
+    res = render.compute(p, {})
+    assert res.overlay_z is not None
+    reqs = render.energy_requests(p, res)
+    assert [r.label for r in reqs] == ["slider", "COM corrected"]
+    assert [r.com_correction for r in reqs] == [False, True]
+    assert reqs[0].shape == reqs[1].shape            # WMMM recomputes beta10 itself
