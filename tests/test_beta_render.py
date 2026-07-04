@@ -1,6 +1,7 @@
 """BetaRender: contract wiring over the beta_parameterization node-set API."""
 import numpy as np
 import pytest
+import beta_parameterization as bp
 
 from src.core import nodes, quadrature
 from src.renders.beta import BetaRender
@@ -69,8 +70,10 @@ def test_com_corrected_overlay(render: BetaRender) -> None:
     assert res.overlay_z is not None and res.overlay_rho is not None
     assert res.overlay_rho[0] == 0.0 and res.overlay_rho[-1] == 0.0
     assert res.overlay_z_cm == pytest.approx(0.0, abs=1e-4)
-    # Legacy-API parity (test-only usage; updated when the 2.3.0 cleanup lands):
-    ref = render._cache.radius_grid_with_com_shift([0.0, 0.85, 0.35, 0.18])
+    # Legacy-API parity against a separate uniform-grid cache — the render's
+    # own cache is node-set-only as of beta-parameterization 2.3.0.
+    with bp.Cache(max_beta_params=8, n_grid=181) as legacy:
+        ref = legacy.radius_grid_with_com_shift([0.0, 0.85, 0.35, 0.18])
     assert res.scalars["corrected_beta10"] == pytest.approx(ref.corrected_beta10, abs=1e-14)
 
 

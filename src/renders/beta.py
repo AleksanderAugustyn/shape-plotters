@@ -20,9 +20,6 @@ from src.core import nodes, quadrature
 from src.core.neck import find_neck_indices, neck_depth
 from src.core.result import NeckInfo, ShapeResult, SliderSpec
 
-# Cache constructor still requires a uniform-grid size; no uniform-grid
-# feature is used (the argument goes away with the library's 2.3.0 cleanup).
-N_GRID = 721
 N_BETAS = 8
 SPHERE_VOLUME = 4.0 * np.pi / 3.0  # unit sphere, R0 units
 # Below this |corrected_beta10| the COM-corrected shape coincides with the
@@ -62,7 +59,7 @@ class BetaRender:
     toggles = []
 
     def __init__(self) -> None:
-        self._cache = bp.Cache(max_beta_params=N_BETAS, n_grid=N_GRID)
+        self._cache = bp.Cache(max_beta_params=N_BETAS)
         self._node_set = self._cache.build_node_set(nodes.THETA)
 
     def compute(self, params: dict[str, float], toggles: dict[str, bool]) -> ShapeResult:
