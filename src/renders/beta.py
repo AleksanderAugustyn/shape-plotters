@@ -8,8 +8,9 @@ the energy model's dense grid. The neck is the Python display-only heuristic
 Two shapes are drawn. The default (blue) shape uses beta10 (= the beta1 slider,
 the l=1 dipole term) as set. The COM-corrected (orange) overlay ignores that
 slider value and uses corrected_beta10 — the dipole the library computes from
-beta2..beta8 to place the center of mass at the origin — shown only when it
-differs meaningfully from the slider shape.
+beta2..beta8 to place the center of mass at the origin —
+shown only when corrected_beta10 differs from the slider beta1 by more than
+the overlay threshold (the two shapes then genuinely differ).
 """
 from __future__ import annotations
 
@@ -18,15 +19,16 @@ import beta_parameterization as bp
 
 from src.core import nodes, quadrature
 from src.core.neck import find_neck_indices, neck_depth
-from src.core.result import NeckInfo, ShapeResult, SliderSpec
+from src.core.result import EnergyRequest, NeckInfo, ShapeResult, SliderSpec
 
-# Cache constructor still requires a uniform-grid size; no uniform-grid
-# feature is used (the argument goes away with the library's 2.3.0 cleanup).
-N_GRID = 721
 N_BETAS = 8
+# WMMM's legendre parameterization takes 20 betas; sliders drive the first 8.
+WMMM_N_LEGENDRE_PARAMS = 20
 SPHERE_VOLUME = 4.0 * np.pi / 3.0  # unit sphere, R0 units
-# Below this |corrected_beta10| the COM-corrected shape coincides with the
-# slider shape, so the orange overlay is suppressed (slider units).
+# The COM-corrected shape coincides with the slider shape when the corrected
+# dipole equals the slider beta1 (beta10 is a shape parameter, not a
+# translation knob); below this |corrected_beta10 - beta1| the orange overlay
+# is suppressed (slider units).
 OVERLAY_BETA10_THRESHOLD = 0.001
 
 
@@ -62,7 +64,7 @@ class BetaRender:
     toggles = []
 
     def __init__(self) -> None:
-        self._cache = bp.Cache(max_beta_params=N_BETAS, n_grid=N_GRID)
+        self._cache = bp.Cache(max_beta_params=N_BETAS)
         self._node_set = self._cache.build_node_set(nodes.THETA)
 
     def compute(self, params: dict[str, float], toggles: dict[str, bool]) -> ShapeResult:
@@ -104,14 +106,14 @@ class BetaRender:
 
         scalars: dict[str, float] = {"vol_factor": vol_factor}
         # COM-corrected (orange) overlay: beta10 recomputed from beta2..beta8 to
-        # center the COM. Built only when it meaningfully differs from the slider
-        # shape (|corrected_beta10| > threshold); below that the two coincide.
+        # center the COM. Built only when it differs from the slider shape
+        # (|corrected_beta10 - beta1| > threshold); below that the two coincide.
         overlay_z = overlay_rho = None
         overlay_z_cm = 0.0
         corrected = self._cache.resolve_shape(betas, apply_com_correction=True)
         if corrected.ok:
             scalars["corrected_beta10"] = corrected.corrected_beta10
-            if ok and abs(corrected.corrected_beta10) > OVERLAY_BETA10_THRESHOLD:
+            if ok and abs(corrected.corrected_beta10 - betas[0]) > OVERLAY_BETA10_THRESHOLD:
                 rd_c = self._cache.radius_and_derivative(corrected.beta_con, self._node_set)
                 if rd_c.ok:
                     vf_c = _unit_volume_factor(rd_c.radii)
@@ -138,3 +140,16 @@ class BetaRender:
     def filename(self, z: int, n: int, params: dict[str, float]) -> str:
         betas = "_".join(f"{params[f'beta{i}']:.2f}" for i in range(1, N_BETAS + 1))
         return f"{z}_{n}_{betas}.png"
+
+    def energy_requests(self, params: dict[str, float],
+                        result: ShapeResult) -> list[EnergyRequest]:
+        """WMMM requests: the slider (blue) shape, plus the COM-corrected
+        (orange) shape when the overlay is on screen. WMMM recomputes beta10
+        itself under com_correction=True, so both carry the same betas."""
+        shape = tuple(params[f"beta{i}"] for i in range(1, N_BETAS + 1)) \
+            + (0.0,) * (WMMM_N_LEGENDRE_PARAMS - N_BETAS)
+        requests = [EnergyRequest("slider", "legendre", shape, com_correction=False)]
+        if result.overlay_z is not None:
+            requests.append(
+                EnergyRequest("COM corrected", "legendre", shape, com_correction=True))
+        return requests

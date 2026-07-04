@@ -212,3 +212,95 @@ def test_beta_com_overlay_when_asymmetric() -> None:
     assert a.rtheta_zcm.get_xdata()[0] == pytest.approx(0.0, abs=1e-4)
     import matplotlib.pyplot as plt
     plt.close(a.fig)
+
+
+# --- WMMM energy button (stub adapter — no real WMMM anywhere) ---
+
+def _fake_energy_result(**overrides):
+    from src.core.energy import EnergyResult
+    base = dict(is_valid=True, mass_excess=1.0, total_energy=2.0,
+                macro_energy=3.0, micro_energy=4.0, surface_energy=5.0,
+                coulomb_energy=6.0, proton_pairing_gap=7.0,
+                neutron_pairing_gap=8.0, proton_k=9, neutron_k=10,
+                corrected_beta10=0.0, error=None)
+    base.update(overrides)
+    return EnergyResult(**base)
+
+
+def test_energy_button_absent_when_unavailable(monkeypatch) -> None:
+    monkeypatch.setattr("src.core.engine.energy.available", lambda: False)
+    a = ShapePlotterApp(BetaRender())
+    assert a.btn_energy is None
+    assert "WMMM" not in a.stats_text.get_text()
+    import matplotlib.pyplot as plt
+    plt.close(a.fig)
+
+
+def test_energy_click_appends_block_and_any_change_clears(monkeypatch) -> None:
+    monkeypatch.setattr("src.core.engine.energy.available", lambda: True)
+    calls = []
+
+    def fake_compute(param_type, z, n, shape, com_correction=True):
+        calls.append((param_type, z, n, tuple(shape), com_correction))
+        return _fake_energy_result()
+
+    monkeypatch.setattr("src.core.engine.energy.compute", fake_compute)
+    a = ShapePlotterApp(BetaRender())
+    assert a.btn_energy is not None
+    a._on_energy()
+    text = a.stats_text.get_text()
+    assert "WMMM [MeV]:" in text and "E_total = 2.0000" in text
+    assert calls == [("legendre", 92, 144, (0.0,) * 20, False)]  # sphere: 1 request
+    a.rows["beta2"].slider.set_val(0.3)          # slider change clears
+    assert "WMMM" not in a.stats_text.get_text()
+    a._on_energy()
+    assert "WMMM" in a.stats_text.get_text()
+    a.z_box._submit("94")                        # Z/N change clears too
+    assert "WMMM" not in a.stats_text.get_text()
+    import matplotlib.pyplot as plt
+    plt.close(a.fig)
+
+
+def test_energy_two_labeled_blocks_when_overlay(monkeypatch) -> None:
+    monkeypatch.setattr("src.core.engine.energy.available", lambda: True)
+    monkeypatch.setattr("src.core.engine.energy.compute",
+                        lambda *a, **k: _fake_energy_result())
+    a = ShapePlotterApp(BetaRender())
+    a.rows["beta3"].slider.set_val(0.4)          # asymmetric -> overlay present
+    assert a.last_result.overlay_z is not None
+    a._on_energy()
+    text = a.stats_text.get_text()
+    assert "WMMM (slider) [MeV]:" in text
+    assert "WMMM (COM corrected) [MeV]:" in text
+    import matplotlib.pyplot as plt
+    plt.close(a.fig)
+
+
+def test_energy_invalid_shape_not_computed(monkeypatch) -> None:
+    monkeypatch.setattr("src.core.engine.energy.available", lambda: True)
+    calls = []
+    monkeypatch.setattr("src.core.engine.energy.compute",
+                        lambda *a, **k: calls.append(a) or _fake_energy_result())
+    a = ShapePlotterApp(BetaRender())
+    a.rows["beta2"].slider.set_val(4.0)          # interior negative -> invalid
+    a._on_energy()
+    assert "WMMM: shape invalid (not computed)" in a.stats_text.get_text()
+    assert calls == []
+    import matplotlib.pyplot as plt
+    plt.close(a.fig)
+
+
+def test_energy_error_and_invalid_results_render(monkeypatch) -> None:
+    monkeypatch.setattr("src.core.engine.energy.available", lambda: True)
+    monkeypatch.setattr("src.core.engine.energy.compute",
+                        lambda *a, **k: _fake_energy_result(is_valid=False))
+    a = ShapePlotterApp(BetaRender())
+    a._on_energy()
+    assert "WMMM: invalid shape" in a.stats_text.get_text()
+    monkeypatch.setattr("src.core.engine.energy.compute",
+                        lambda *a, **k: _fake_energy_result(error="boom"))
+    a._on_energy()
+    text = a.stats_text.get_text()
+    assert "WMMM: error" in text and "boom" in text
+    import matplotlib.pyplot as plt
+    plt.close(a.fig)

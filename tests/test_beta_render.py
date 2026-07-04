@@ -1,6 +1,7 @@
 """BetaRender: contract wiring over the beta_parameterization node-set API."""
 import numpy as np
 import pytest
+import beta_parameterization as bp
 
 from src.core import nodes, quadrature
 from src.renders.beta import BetaRender
@@ -69,8 +70,10 @@ def test_com_corrected_overlay(render: BetaRender) -> None:
     assert res.overlay_z is not None and res.overlay_rho is not None
     assert res.overlay_rho[0] == 0.0 and res.overlay_rho[-1] == 0.0
     assert res.overlay_z_cm == pytest.approx(0.0, abs=1e-4)
-    # Legacy-API parity (test-only usage; updated when the 2.3.0 cleanup lands):
-    ref = render._cache.radius_grid_with_com_shift([0.0, 0.85, 0.35, 0.18])
+    # Legacy-API parity against a separate uniform-grid cache — the render's
+    # own cache is node-set-only as of beta-parameterization 2.3.0.
+    with bp.Cache(max_beta_params=8, n_grid=181) as legacy:
+        ref = legacy.radius_grid_with_com_shift([0.0, 0.85, 0.35, 0.18])
     assert res.scalars["corrected_beta10"] == pytest.approx(ref.corrected_beta10, abs=1e-14)
 
 
@@ -111,6 +114,25 @@ def test_invalid_shape_returns_status_not_exception(render: BetaRender) -> None:
     assert res.r_north == 0.0 and res.r_south == 0.0
 
 
+def test_overlay_when_slider_beta1_differs(render: BetaRender) -> None:
+    # Symmetric multipoles with a nonzero slider beta1: corrected_beta10 ~ 0,
+    # yet the slider shape differs from the COM-corrected one — beta10 is a
+    # shape parameter, not a translation. The overlay must show.
+    res = render.compute(_params([0.5, 0.30, 0.0, 0.10]), {})
+    assert res.ok
+    assert abs(res.scalars["corrected_beta10"]) <= 1e-3
+    assert res.overlay_z is not None
+
+
+def test_no_overlay_when_slider_matches_corrected(render: BetaRender) -> None:
+    # Slider beta1 set to the corrected dipole: the two shapes coincide.
+    first = render.compute(_params([0.0, 0.85, 0.35, 0.18]), {})
+    corrected = first.scalars["corrected_beta10"]
+    res = render.compute(_params([corrected, 0.85, 0.35, 0.18]), {})
+    assert res.ok
+    assert res.overlay_z is None
+
+
 def test_slider_specs_and_filename(render: BetaRender) -> None:
     assert [s.key for s in render.slider_specs] == [f"beta{i}" for i in range(1, 9)]
     assert (render.slider_specs[0].vmin, render.slider_specs[0].vmax) == (-1.6, 1.6)
@@ -118,3 +140,24 @@ def test_slider_specs_and_filename(render: BetaRender) -> None:
     assert render.has_extra_panel is False
     name = render.filename(92, 144, _params([0.0, 1.25]))
     assert name == "92_144_0.00_1.25_0.00_0.00_0.00_0.00_0.00_0.00.png"
+
+
+def test_energy_requests_single_without_overlay(render: BetaRender) -> None:
+    p = _params([0.0, 0.30])
+    res = render.compute(p, {})
+    assert res.overlay_z is None
+    (req,) = render.energy_requests(p, res)
+    assert (req.label, req.param_type, req.com_correction) == ("slider", "legendre", False)
+    assert len(req.shape) == 20                      # WMMM's legendre width
+    assert req.shape[:8] == (0.0, 0.30, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
+    assert req.shape[8:] == (0.0,) * 12              # zero-padded tail
+
+
+def test_energy_requests_both_with_overlay(render: BetaRender) -> None:
+    p = _params([0.0, 0.85, 0.35, 0.18])
+    res = render.compute(p, {})
+    assert res.overlay_z is not None
+    reqs = render.energy_requests(p, res)
+    assert [r.label for r in reqs] == ["slider", "COM corrected"]
+    assert [r.com_correction for r in reqs] == [False, True]
+    assert reqs[0].shape == reqs[1].shape            # WMMM recomputes beta10 itself

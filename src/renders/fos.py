@@ -13,9 +13,12 @@ import fos_parameterization as fp
 
 from src.core import nodes
 from src.core.neck import find_neck_indices, neck_depth
-from src.core.result import NeckInfo, ShapeResult, SliderSpec, ToggleSpec
+from src.core.result import EnergyRequest, NeckInfo, ShapeResult, SliderSpec, ToggleSpec
 
-N_GRID = 721        # rho(z) display panel only
+# rho(z) display-panel resolution (native COM-frame profile) — a display
+# choice, not a calculation grid: the GL theta-nodes sample the star-convex
+# frame and cannot replace it.
+N_PROFILE_POINTS = 721
 N_RHO_GRID = 7201   # shape() validity grid — WMMM's N_FOS_RHO_GRID_POINTS
 PARAM_KEYS = ("c", "a3", "a4", "a5", "a6", "a7", "a8")
 
@@ -35,7 +38,7 @@ class FoSRender:
     def compute(self, params: dict[str, float], toggles: dict[str, bool]) -> ShapeResult:
         arr = [params[k] for k in PARAM_KEYS]
         shp = fp.shape(arr, N_RHO_GRID)
-        prof = fp.rho_profile(arr, N_GRID)
+        prof = fp.rho_profile(arr, N_PROFILE_POINTS)
         rd = fp.radius_and_derivative(arr, nodes.THETA, shp.z_shift) if shp.ok else None
         ok = shp.ok and rd is not None and rd.ok and prof.ok
 
@@ -78,3 +81,11 @@ class FoSRender:
         return (f"fos_shape_Z{z}_N{n}_c{params['c']:.2f}"
                 + "".join(f"_a{i}{params[f'a{i}']:.2f}" for i in range(3, 9))
                 + ".png")
+
+    def energy_requests(self, params: dict[str, float],
+                        result: ShapeResult) -> list[EnergyRequest]:
+        """One request — the FoS dashed overlay is a reframing of the same
+        shape, not a second shape; com_correction is inert on the FoS path."""
+        return [EnergyRequest("FoS", "fos",
+                              tuple(params[k] for k in PARAM_KEYS),
+                              com_correction=True)]
