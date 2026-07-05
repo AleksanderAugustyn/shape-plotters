@@ -55,14 +55,20 @@ class FoSRender:
         else:
             status, status_name, message = int(prof.status), prof.status.name, prof.message
 
+        # Draw the neck even for shapes flagged invalid (e.g. not star-convex):
+        # the library computes the neck from the rho(z) profile, independent of
+        # the R(theta) star-convexity gate. Skip only separated shapes (interior
+        # rho <= 0): the fragments have split and the neck radius is 0.
         neck_info = None
-        if ok:
+        separated = shp.status == fp.Status.ERROR_RHO_NEGATIVE
+        if not separated:
             nk = fp.neck(arr)
-            if nk.ok and nk.found:
+            if nk.ok and nk.found and nk.rho_neck > 0.0:
                 depth = 0.0
-                hit = find_neck_indices(prof.rho)
-                if hit is not None:
-                    depth = neck_depth(prof.rho, *hit)
+                if prof.ok:
+                    hit = find_neck_indices(prof.rho)
+                    if hit is not None:
+                        depth = neck_depth(prof.rho, *hit)
                 neck_info = NeckInfo(z=nk.z_neck, rho=nk.rho_neck,
                                      depth=depth, source="lib")
         # The FoS shape is COM-centered by definition (rho_profile is the COM

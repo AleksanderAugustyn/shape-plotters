@@ -32,14 +32,12 @@ UNITS_LABEL = "fm units"
 # WMMM scission bands: neck radius 1.2-1.5 fm (comparable because display
 # R0 = 1.16 fm equals WMMM's geometric R0; see FORD.md / v0.2 handoff).
 SCISSION_BAND_FM = (1.2, 1.5)
-SCISSION_LABEL = "scission bands"
 
 
 class ShapePlotterApp:
     def __init__(self, render) -> None:
         self.render = render
         self.fm_units = True
-        self.show_scission = False
         self.toggle_state = {t.key: t.default for t in render.toggles}
         self.last_result: ShapeResult | None = None
         self._last_ok: bool | None = None
@@ -102,9 +100,9 @@ class ShapePlotterApp:
                                      label=ov_zcm_label)
         self.scission_bands = [
             ax.axhspan(SCISSION_BAND_FM[0], SCISSION_BAND_FM[1],
-                       color=NECK_COLOR, alpha=0.15, visible=False),
+                       color=NECK_COLOR, alpha=0.15),
             ax.axhspan(-SCISSION_BAND_FM[1], -SCISSION_BAND_FM[0],
-                       color=NECK_COLOR, alpha=0.15, visible=False),
+                       color=NECK_COLOR, alpha=0.15),
         ]
         ax.set_aspect("equal", adjustable="datalim")
         ax.set_xlabel(f"z [{unit}]")
@@ -148,8 +146,8 @@ class ShapePlotterApp:
         self.btn_reset.on_clicked(self._reset)
         self.btn_save = Button(self.fig.add_axes((0.86, 0.27, 0.10, 0.030)), "Save")
         self.btn_save.on_clicked(self._save)
-        labels = [UNITS_LABEL, SCISSION_LABEL] + [t.label for t in self.render.toggles]
-        actives = [self.fm_units, self.show_scission] + [t.default for t in self.render.toggles]
+        labels = [UNITS_LABEL] + [t.label for t in self.render.toggles]
+        actives = [self.fm_units] + [t.default for t in self.render.toggles]
         n = len(labels)
         self.checks = CheckButtons(
             self.fig.add_axes((0.86, 0.26 - 0.04 * n, 0.11, 0.04 * n)), labels, actives)
@@ -183,10 +181,6 @@ class ShapePlotterApp:
         if label == UNITS_LABEL:
             self.fm_units = not self.fm_units
             self._relabel_units()
-        elif label == SCISSION_LABEL:
-            self.show_scission = not self.show_scission
-            for band in self.scission_bands:
-                band.set_visible(self.show_scission)
         else:
             for t in self.render.toggles:
                 if t.label == label:
