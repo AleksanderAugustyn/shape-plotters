@@ -66,16 +66,14 @@ def _band_top(band) -> float:
     return max(xy[1] for xy in band.get_xy())  # Polygon fallback
 
 
-def test_scission_bands_default_hidden(app) -> None:
+def test_scission_bands_visible_by_default(app) -> None:
     assert len(app.scission_bands) == 2
-    assert not any(b.get_visible() for b in app.scission_bands)
-
-
-def test_scission_toggle_flips_visibility(app) -> None:
-    app._on_check("scission bands")
     assert all(b.get_visible() for b in app.scission_bands)
-    app._on_check("scission bands")
-    assert not any(b.get_visible() for b in app.scission_bands)
+
+
+def test_scission_has_no_checkbox(app) -> None:
+    labels = [t.get_text() for t in app.checks.labels]
+    assert "scission bands" not in labels
 
 
 def test_scission_bands_rescale_on_unit_toggle(app) -> None:

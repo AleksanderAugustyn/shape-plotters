@@ -67,6 +67,25 @@ def test_invalid_c_returns_status_not_exception(render: FoSRender) -> None:
     assert res.dr_dtheta.shape == (nodes.N_NODES,) and not res.dr_dtheta.any()
 
 
+def test_invalid_not_star_convex_still_has_neck(render: FoSRender) -> None:
+    # Strongly necked, left-right asymmetric shape the lib rejects for
+    # star-convexity — the neck is still well-defined and must be plotted.
+    res = render.compute({**SPHERE, "c": 2.0, "a3": 0.4, "a4": 0.67}, {})
+    assert not res.ok
+    assert res.status_name == "ERROR_NOT_STAR_CONVEX"
+    assert res.neck is not None
+    assert res.neck.source == "lib"
+    assert res.neck.rho > 0.0
+
+
+def test_separated_shape_has_no_neck(render: FoSRender) -> None:
+    # Interior rho <= 0: the body has split, so the neck radius is 0 by
+    # definition and no neck line should be drawn.
+    res = render.compute({**SPHERE, "c": 2.5, "a4": 1.2}, {})
+    assert res.status_name == "ERROR_RHO_NEGATIVE"
+    assert res.neck is None
+
+
 def test_slider_specs_and_filename(render: FoSRender) -> None:
     assert [s.key for s in render.slider_specs] == ["c", "a3", "a4", "a5", "a6", "a7", "a8"]
     assert render.slider_specs[0].markers == (1.0, 3.0)
