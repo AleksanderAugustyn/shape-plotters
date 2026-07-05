@@ -70,7 +70,9 @@ def test_invalid_c_returns_status_not_exception(render: FoSRender) -> None:
 def test_invalid_not_star_convex_still_has_neck(render: FoSRender) -> None:
     # Strongly necked, left-right asymmetric shape the lib rejects for
     # star-convexity — the neck is still well-defined and must be plotted.
-    res = render.compute({**SPHERE, "c": 2.0, "a3": 0.4, "a4": 0.67}, {})
+    # (a4 sits past the star-convexity boundary that fos-parameterization 1.3.0
+    # relaxed; the prior a4=0.67 fixture now validates.)
+    res = render.compute({**SPHERE, "c": 2.0, "a3": 0.39, "a4": 0.71}, {})
     assert not res.ok
     assert res.status_name == "ERROR_NOT_STAR_CONVEX"
     assert res.neck is not None

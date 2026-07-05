@@ -30,6 +30,10 @@ SPHERE_VOLUME = 4.0 * np.pi / 3.0  # unit sphere, R0 units
 # translation knob); below this |corrected_beta10 - beta1| the orange overlay
 # is suppressed (slider units).
 OVERLAY_BETA10_THRESHOLD = 0.001
+# Uniform-theta display grid (poles included) for drawing invalid shapes greyed.
+# The node-set API zeroes R(theta) on a negative-radius error; the grid API keeps
+# it, so invalid shapes fall back to this grid instead of collapsing to a point.
+N_INVALID_GRID = 721
 
 
 def _unit_volume_factor(radii: np.ndarray) -> float:
@@ -64,7 +68,7 @@ class BetaRender:
     toggles = []
 
     def __init__(self) -> None:
-        self._cache = bp.Cache(max_beta_params=N_BETAS)
+        self._cache = bp.Cache(max_beta_params=N_BETAS, n_grid=N_INVALID_GRID)
         self._node_set = self._cache.build_node_set(nodes.THETA)
 
     def compute(self, params: dict[str, float], toggles: dict[str, bool]) -> ShapeResult:
@@ -88,13 +92,21 @@ class BetaRender:
             # The slider shape's COM sits on the z axis at z_cm (nonzero for
             # asymmetric betas — the red marker shows the offset).
             z_cm = quadrature.z_cm(nodes.THETA, radii)
+            z = radii * nodes.X
+            rho = radii * nodes.SIN_THETA
         else:
             radii = np.zeros(nodes.N_NODES)
             dr_dtheta = np.zeros(nodes.N_NODES)
             r_north = r_south = z_cm = 0.0
+            # The node-set API zeroed R(theta) on the negative-radius error. Re-
+            # evaluate on the uniform grid, which keeps R even where it goes
+            # negative, so the broken (self-crossing) outline still draws — the
+            # engine greys it — instead of the shape collapsing to a point.
+            grid = self._cache.radius_grid(betas)
+            thetas = np.linspace(0.0, np.pi, self._cache.n_grid)
+            z = grid.radii * np.cos(thetas)
+            rho = grid.radii * np.sin(thetas)
 
-        z = radii * nodes.X
-        rho = radii * nodes.SIN_THETA
         neck = None
         if ok:
             hit = find_neck_indices(rho)
@@ -110,6 +122,7 @@ class BetaRender:
         # (|corrected_beta10 - beta1| > threshold); below that the two coincide.
         overlay_z = overlay_rho = None
         overlay_z_cm = 0.0
+        overlay_ok = True
         corrected = self._cache.resolve_shape(betas, apply_com_correction=True)
         if corrected.ok:
             scalars["corrected_beta10"] = corrected.corrected_beta10
@@ -127,6 +140,18 @@ class BetaRender:
                     overlay_z = np.concatenate(([first], z_c, [last]))
                     overlay_rho = np.concatenate(([0.0], rho_c, [0.0]))
                     overlay_z_cm = quadrature.z_cm(nodes.THETA, radii_c)
+                else:
+                    # The COM-centering beta10 exists (resolve validated the poles
+                    # + COM convergence) but its shape is interior-negative. Draw
+                    # it greyed via the grid fallback — which keeps R(theta) even
+                    # where it dips below zero — so the near-miss is visible
+                    # instead of the overlay silently vanishing.
+                    grid_c = self._cache.radius_grid_with_com_shift(betas)
+                    thetas = np.linspace(0.0, np.pi, self._cache.n_grid)
+                    overlay_z = grid_c.radii * np.cos(thetas)
+                    overlay_rho = grid_c.radii * np.sin(thetas)
+                    overlay_z_cm = 0.0
+                    overlay_ok = False
 
         primary = rd if resolved.ok else resolved
         return ShapeResult(
@@ -135,7 +160,8 @@ class BetaRender:
             theta=nodes.THETA, radius=radii, z=z, rho=rho, drho_dz=None,
             neck=neck, scalars=scalars, length_keys=frozenset(),
             dr_dtheta=dr_dtheta, r_north=r_north, r_south=r_south, z_cm=z_cm,
-            overlay_z=overlay_z, overlay_rho=overlay_rho, overlay_z_cm=overlay_z_cm)
+            overlay_z=overlay_z, overlay_rho=overlay_rho, overlay_z_cm=overlay_z_cm,
+            overlay_ok=overlay_ok)
 
     def filename(self, z: int, n: int, params: dict[str, float]) -> str:
         betas = "_".join(f"{params[f'beta{i}']:.2f}" for i in range(1, N_BETAS + 1))

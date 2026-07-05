@@ -112,6 +112,8 @@ def test_invalid_shape_returns_status_not_exception(render: BetaRender) -> None:
     assert res.radius.shape == (nodes.N_NODES,) and not res.radius.any()
     assert res.dr_dtheta.shape == (nodes.N_NODES,) and not res.dr_dtheta.any()
     assert res.r_north == 0.0 and res.r_south == 0.0
+    # Invalid geometry is drawn greyed (grid fallback), not collapsed to a point.
+    assert res.rho.any() and res.z.any()
 
 
 def test_overlay_when_slider_beta1_differs(render: BetaRender) -> None:

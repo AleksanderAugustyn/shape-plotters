@@ -41,6 +41,7 @@ class ShapePlotterApp:
         self.toggle_state = {t.key: t.default for t in render.toggles}
         self.last_result: ShapeResult | None = None
         self._last_ok: bool | None = None
+        self._last_overlay_ok: bool | None = None
         self._stats_base = ""
         self._energy_lines: list[str] = []
         self._build_figure()
@@ -356,8 +357,11 @@ class ShapePlotterApp:
                 self.rtheta_upper.set_data(zr, rr)
                 self.rtheta_lower.set_data(zr, -rr)
                 self.rtheta_zcm.set_data([zc_r], [0.0])
-        for art in (self.rtheta_upper, self.rtheta_lower, self.rtheta_zcm):
+        self._apply_overlay_validity(result.overlay_ok)
+        for art in (self.rtheta_upper, self.rtheta_lower):
             art.set_visible(show_rtheta)
+        # No COM marker for an invalid corrected shape — it isn't centered anywhere.
+        self.rtheta_zcm.set_visible(show_rtheta and result.overlay_ok)
         self.shape_legend.set_visible(show_rtheta)
 
         self._stats_base = self._stats_block(result, scale, unit, v, s, zc)
@@ -389,6 +393,19 @@ class ShapePlotterApp:
             self.extra_rho.set_alpha(alpha)
             self.extra_drho.set_color(deriv)
             self.extra_drho.set_alpha(alpha)
+
+    def _apply_overlay_validity(self, ok: bool) -> None:
+        # The COM-corrected overlay greys when its own shape is invalid (a
+        # centering beta10 exists but self-intersects). Flip-cached like the
+        # main-shape greying to avoid per-frame color churn.
+        if ok == self._last_overlay_ok:
+            return
+        self._last_overlay_ok = ok
+        color = RTHETA_COLOR if ok else INVALID_COLOR
+        alpha = 1.0 if ok else 0.45
+        for line in (self.rtheta_upper, self.rtheta_lower):
+            line.set_color(color)
+            line.set_alpha(alpha)
 
     def _stats_block(self, result: ShapeResult, scale: float, unit: str,
                      v: float, s: float, zc: float) -> str:

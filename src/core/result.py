@@ -85,6 +85,7 @@ class ShapeResult:
     overlay_z: Array | None = None
     overlay_rho: Array | None = None
     overlay_z_cm: float = 0.0
+    overlay_ok: bool = True           # False => corrected shape is invalid; grey the overlay
 
     @property
     def ok(self) -> bool:
