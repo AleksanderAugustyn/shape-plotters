@@ -52,6 +52,24 @@ def test_neck_line_visibility_tracks_result() -> None:
     plt.close(a.fig)
 
 
+def test_fragments_shown_for_necked_shape() -> None:
+    import re
+    a = ShapePlotterApp(BetaRender())
+    assert "fragments" not in a.stats_text.get_text()   # sphere default: no neck
+    a.rows["beta2"].slider.set_val(1.5)                  # necked shape (verified)
+    assert a.last_result.neck is not None
+    text = a.stats_text.get_text()
+    assert "fragments (@ z_neck)" in text
+    vol = re.search(r"vol frac = ([\d.]+) : ([\d.]+)", text)
+    mass = re.search(r"mass A   = (\d+) : (\d+)  \(A=(\d+)\)", text)
+    assert vol is not None and mass is not None
+    assert float(vol.group(1)) >= float(vol.group(2))    # heavy : light
+    assert int(mass.group(1)) >= int(mass.group(2))
+    assert int(mass.group(3)) == a.z_box.value + a.n_box.value   # A = Z + N = 236
+    import matplotlib.pyplot as plt
+    plt.close(a.fig)
+
+
 def test_widget_draws_suppressed(app) -> None:
     widgets = [app.btn_reset, app.btn_save, app.checks]
     for row in app.rows.values():

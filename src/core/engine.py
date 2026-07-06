@@ -15,7 +15,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.widgets import Button, CheckButtons
 
-from src.core import energy, quadrature
+from src.core import energy, fragments, quadrature
 from src.core.result import ShapeResult
 from src.core.widgets import IntTextBox, SliderRow
 
@@ -364,7 +364,21 @@ class ShapePlotterApp:
         self.rtheta_zcm.set_visible(show_rtheta and result.overlay_ok)
         self.shape_legend.set_visible(show_rtheta)
 
-        self._stats_base = self._stats_block(result, scale, unit, v, s, zc)
+        # Fragment split at the neck (R0 units; the fm scale cancels in a ratio,
+        # so only the mass split f*(Z+N) needs the display Z/N).
+        frag = None
+        if result.neck is not None:
+            v_lo, v_hi = fragments.fragment_volumes(
+                result.z, result.rho, result.neck.z,
+                -result.r_south, result.r_north)
+            total = v_lo + v_hi
+            if total > 0.0 and v_lo > 0.0 and v_hi > 0.0:
+                a_mass = self.z_box.value + self.n_box.value
+                fracs = sorted((v_lo / total, v_hi / total), reverse=True)
+                frag = (fracs[0], fracs[1],
+                        fracs[0] * a_mass, fracs[1] * a_mass, a_mass)
+
+        self._stats_base = self._stats_block(result, scale, unit, v, s, zc, frag)
         self._energy_lines = []   # any shape/Z/N/unit change invalidates energies
         self._refresh_stats()
 
@@ -408,7 +422,8 @@ class ShapePlotterApp:
             line.set_alpha(alpha)
 
     def _stats_block(self, result: ShapeResult, scale: float, unit: str,
-                     v: float, s: float, zc: float) -> str:
+                     v: float, s: float, zc: float,
+                     frag: tuple[float, float, float, float, int] | None = None) -> str:
         lines = [f"[{self.render.name}]  units: {unit}"]
         if not result.ok:
             lines += [f"INVALID: {result.status_name} ({result.status})", ""]
@@ -425,6 +440,11 @@ class ShapePlotterApp:
         lines += ["", f"volume  = {v:.4f} {unit}³ (GL)",
                   f"surface = {s:.4f} {unit}² (GL)",
                   f"z_cm    = {zc:.4f} {unit} (GL)"]
+        if frag is not None:
+            f_hi, f_lo, a_hi, a_lo, a_tot = frag
+            lines += ["", "fragments (@ z_neck):",
+                      f"  vol frac = {f_hi:.2f} : {f_lo:.2f}",
+                      f"  mass A   = {a_hi:.0f} : {a_lo:.0f}  (A={a_tot})"]
         return "\n".join(lines)
 
     def run(self) -> None:
