@@ -1,2 +1,2 @@
-beta-parameterization==2.3.2
-fos-parameterization==1.3.0
+beta-parameterization==2.3.3
+fos-parameterization==1.3.1

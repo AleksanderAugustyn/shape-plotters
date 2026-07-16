@@ -8,14 +8,10 @@ One shared engine; each parameterization is a render module.
     python3 -m venv .venv
     source .venv/bin/activate
     pip install numpy scipy matplotlib pytest
-    pip install -r requirements-libs.txt \
-      --find-links https://github.com/AleksanderAugustyn/beta-parameterization/releases/expanded_assets/2.3.2 \
-      --find-links https://github.com/AleksanderAugustyn/fos-parameterization/releases/expanded_assets/1.3.0
+    pip install -r requirements-libs.txt
 
-The parameterization libraries install as prebuilt Linux wheels from each
-repo's GitHub Release (Fortran shared library and libgfortran bundled). To
-pin new versions, bump `requirements-libs.txt` and the `--find-links` tags
-together. When these libraries reach PyPI, drop the `--find-links` flags.
+The parameterization libraries install from PyPI as prebuilt manylinux wheels
+(Fortran shared library and libgfortran bundled).
 
 ### WSL
 
