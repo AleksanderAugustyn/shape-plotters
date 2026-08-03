@@ -36,7 +36,7 @@ def test_invalid_shape_greys_and_banners() -> None:
     a = ShapePlotterApp(BetaRender())
     a.rows["beta2"].slider.set_val(4.0)  # interior negative -> invalid
     assert not a.last_result.ok
-    assert "ERROR_INTERIOR_NEGATIVE" in a.ax_shape.get_title()
+    assert "interior_negative" in a.ax_shape.get_title()
     import matplotlib.pyplot as plt
     plt.close(a.fig)
 

@@ -39,10 +39,12 @@ def test_beta_both_variants_and_com_crosscheck() -> None:
         assert all(math.isfinite(getattr(er, f)) for f in _ENERGY_FIELDS)
     # com off: beta10 evaluated as given (the slider value, here 0).
     assert results[0].corrected_beta10 == pytest.approx(0.0, abs=1e-12)
-    # com on: WMMM's corrected dipole equals the render's — same library,
-    # two independent call paths.
+    # com on: WMMM's corrected dipole matches the render's within the COM
+    # convergence window (|z_cm| < 1e-5): WMMM is still on beta-param 2.3.3
+    # (damped fixed-point) while the render uses 3.0.0 (Newton). Tighten back
+    # to 1e-9 once wmmm lands its 3.0.0 migration.
     assert results[1].corrected_beta10 == pytest.approx(
-        res.scalars["corrected_beta10"], abs=1e-9)
+        res.scalars["corrected_beta10"], abs=2e-5)
     # The two variants are genuinely different shapes.
     assert results[0].total_energy != results[1].total_energy
 

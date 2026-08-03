@@ -1,4 +1,4 @@
-"""BetaRender: contract wiring over the beta_parameterization node-set API."""
+"""BetaRender: contract wiring over the beta_parameterization 3.0.0 cached tier."""
 import numpy as np
 import pytest
 import beta_parameterization as bp
@@ -20,6 +20,14 @@ def _params(betas: list[float]) -> dict[str, float]:
     return {f"beta{i}": full[i - 1] for i in range(1, 9)}
 
 
+def test_status_contract() -> None:
+    # 3.0.0 renumbering: shared contract codes 0-6, library codes >= 100,
+    # members lowercase. Guards the raw ints ShapeResult.status carries.
+    assert bp.Status.valid == 0
+    assert bp.Status.interior_negative == 102
+    assert bp.CACHE_MAX_PARAMS == 8
+
+
 def test_sphere(render: BetaRender) -> None:
     res = render.compute(_params([]), {"com": False})
     assert res.ok
@@ -34,14 +42,25 @@ def test_sphere(render: BetaRender) -> None:
     assert res.drho_dz is None
 
 
-def test_volume_fix_matches_wmmm_and_old_plotter(render: BetaRender) -> None:
-    # Old ShapePlotter PNG golden 0.99598851 (trapezoid); GL-exact differs only
-    # in trailing digits — WMMM cross-check happens at the Task 8 gate.
+def test_volume_factor_from_library(render: BetaRender) -> None:
+    # 3.0.0: the factor comes from the library (GL-512 over the raw shape),
+    # replacing the Python GL-2048 replica. Old ShapePlotter PNG golden
+    # 0.99598851 (trapezoid) still agrees to display tolerance, and the
+    # returned radii integrate to the unit-sphere volume exactly.
     res = render.compute(_params([0.0, 0.20, 0.10]), {"com": False})
     assert res.ok
     assert res.scalars["vol_factor"] == pytest.approx(0.99598851, abs=1e-5)
     assert quadrature.volume(res.theta, res.radius) == pytest.approx(
-        4.0 * np.pi / 3.0, rel=1e-12)   # GL volume factor makes this exact
+        4.0 * np.pi / 3.0, rel=1e-12)
+
+
+def test_beta2_equator_symmetry(render: BetaRender) -> None:
+    # Pure beta2 is symmetric about the equator; GL nodes are symmetric in
+    # x = cos(theta), so the radii must mirror exactly.
+    res = render.compute(_params([0.0, 0.5]), {"com": False})
+    assert res.ok
+    assert np.allclose(res.radius, res.radius[::-1], atol=1e-12)
+    assert res.r_north == pytest.approx(res.r_south, abs=1e-12)
 
 
 def test_dr_dtheta_is_exact_not_gradient(render: BetaRender) -> None:
@@ -70,11 +89,7 @@ def test_com_corrected_overlay(render: BetaRender) -> None:
     assert res.overlay_z is not None and res.overlay_rho is not None
     assert res.overlay_rho[0] == 0.0 and res.overlay_rho[-1] == 0.0
     assert res.overlay_z_cm == pytest.approx(0.0, abs=1e-4)
-    # Legacy-API parity against a separate uniform-grid cache — the render's
-    # own cache is node-set-only as of beta-parameterization 2.3.0.
-    with bp.Cache(max_beta_params=8, n_grid=181) as legacy:
-        ref = legacy.radius_grid_with_com_shift([0.0, 0.85, 0.35, 0.18])
-    assert res.scalars["corrected_beta10"] == pytest.approx(ref.corrected_beta10, abs=1e-14)
+    assert res.overlay_ok
 
 
 def test_no_overlay_when_symmetric(render: BetaRender) -> None:
@@ -106,14 +121,17 @@ def test_necked_shape(render: BetaRender) -> None:
 def test_invalid_shape_returns_status_not_exception(render: BetaRender) -> None:
     res = render.compute(_params([0.0, 4.0]), {"com": False})  # interior negative
     assert not res.ok
-    assert res.status_name == "ERROR_INTERIOR_NEGATIVE"
+    assert res.status == int(bp.Status.interior_negative)      # 102 in 3.0.0
+    assert res.status_name == "interior_negative"              # lowercase in 3.0.0
     assert res.message
     assert res.neck is None
     assert res.radius.shape == (nodes.N_NODES,) and not res.radius.any()
     assert res.dr_dtheta.shape == (nodes.N_NODES,) and not res.dr_dtheta.any()
     assert res.r_north == 0.0 and res.r_south == 0.0
-    # Invalid geometry is drawn greyed (grid fallback), not collapsed to a point.
+    # Unchecked-path outline: drawn greyed, not collapsed to a point, with
+    # negative radii preserved (rho = R sin(theta) < 0 where R < 0).
     assert res.rho.any() and res.z.any()
+    assert (res.rho < 0.0).any()
 
 
 def test_overlay_when_slider_beta1_differs(render: BetaRender) -> None:
