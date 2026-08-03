@@ -1,4 +1,4 @@
-"""ShapePlotters entry point: python main.py beta|fos"""
+"""shape-plotters entry point: python main.py beta|fos"""
 import argparse
 
 from src.core.engine import ShapePlotterApp

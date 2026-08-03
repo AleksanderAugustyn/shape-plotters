@@ -54,7 +54,7 @@ class ShapePlotterApp:
     def _build_figure(self) -> None:
         self.fig = plt.figure(figsize=(15, 9))
         try:
-            self.fig.canvas.manager.set_window_title(f"ShapePlotters — {self.render.name}")
+            self.fig.canvas.manager.set_window_title(f"shape-plotters — {self.render.name}")
         except AttributeError:
             pass  # headless backends may lack a window manager
         ncols = 3 if self.render.has_extra_panel else 2

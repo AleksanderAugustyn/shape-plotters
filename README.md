@@ -1,4 +1,4 @@
-# ShapePlotters
+# shape-plotters
 
 Interactive matplotlib plotters for nuclear shape parameterizations.
 One shared engine; each parameterization is a render module.
@@ -20,8 +20,8 @@ Windows drive is a 9P mount; a venv there makes matplotlib rendering sluggish
 (~5× slower). If the repo lives under `/mnt/c`, create the venv in your Linux
 home instead:
 
-    python3 -m venv ~/.venvs/shapeplotters
-    source ~/.venvs/shapeplotters/bin/activate
+    python3 -m venv ~/.venvs/shape-plotters
+    source ~/.venvs/shape-plotters/bin/activate
 
 ## Run
 

@@ -1,4 +1,4 @@
-# ShapePlotters
+# shape-plotters
 
 ## Atlas (cross-project knowledge base)
 

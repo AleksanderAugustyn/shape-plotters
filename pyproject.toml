@@ -1,5 +1,5 @@
 [project]
-name = "shapeplotters"
+name = "shape-plotters"
 version = "0.1.0"
 description = "Interactive matplotlib plotters for nuclear shape parameterizations (beta, FoS)"
 requires-python = ">=3.10"
