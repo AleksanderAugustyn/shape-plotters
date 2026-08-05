@@ -61,7 +61,7 @@ def test_necked_shape(render: FoSRender) -> None:
 def test_invalid_c_returns_status_not_exception(render: FoSRender) -> None:
     res = render.compute({**SPHERE, "c": 0.0}, {})
     assert not res.ok
-    assert res.status_name in ("ERROR_INVALID_C", "ERROR_INVALID_ARGUMENTS")
+    assert res.status_name == "invalid_c"
     assert res.neck is None
     assert res.radius.shape == (nodes.N_NODES,) and not res.radius.any()
     assert res.dr_dtheta.shape == (nodes.N_NODES,) and not res.dr_dtheta.any()
@@ -74,7 +74,7 @@ def test_invalid_not_star_convex_still_has_neck(render: FoSRender) -> None:
     # relaxed; the prior a4=0.67 fixture now validates.)
     res = render.compute({**SPHERE, "c": 2.0, "a3": 0.39, "a4": 0.71}, {})
     assert not res.ok
-    assert res.status_name == "ERROR_NOT_STAR_CONVEX"
+    assert res.status_name == "not_star_convex"
     assert res.neck is not None
     assert res.neck.source == "lib"
     assert res.neck.rho > 0.0
@@ -84,7 +84,11 @@ def test_separated_shape_has_no_neck(render: FoSRender) -> None:
     # Interior rho <= 0: the body has split, so the neck radius is 0 by
     # definition and no neck line should be drawn.
     res = render.compute({**SPHERE, "c": 2.5, "a4": 1.2}, {})
-    assert res.status_name == "ERROR_RHO_NEGATIVE"
+    # 2.0.0 gate precedence: the beak verdict is checked before the rho scan,
+    # so a shape that is both rho-negative and beak-failing reports the beak.
+    # The neck must still be absent: the cylindrical path rejects it with
+    # rho_negative inside neck() itself.
+    assert res.status_name == "beak_singularity"
     assert res.neck is None
 
 

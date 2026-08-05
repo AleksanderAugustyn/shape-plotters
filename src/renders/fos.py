@@ -1,10 +1,14 @@
-"""FoS render over the fos_parameterization package.
+"""FoS render over the fos_parameterization package (2.0.0).
 
 rho(z)-native (lib-exact drho_dz, lib-native neck); R(theta) and analytic
-dR/dtheta come from the library's arbitrary-node evaluator on the shared
-GL-2048 set (src/core/nodes.py) — in sync with the energy model's dense
-grid. Neck position/radius are lib values; only the displayed depth reuses
-the shared peak analysis on the profile.
+dR/dtheta come from the library's cached tier on the shared GL-2048 set
+(src/core/nodes.py) — in sync with the energy model's dense grid. The cache
+evaluates R(theta) in the total-shift frame internally, so no z_shift
+plumbing. Neck position/radius are lib values on the cache's u-grid; only
+the displayed depth reuses the shared peak analysis on the display profile.
+
+Fast-math precondition: params must be finite. Sliders only emit finite
+values, so no screening happens here.
 """
 from __future__ import annotations
 
@@ -17,9 +21,10 @@ from src.core.result import EnergyRequest, NeckInfo, ShapeResult, SliderSpec, To
 
 # rho(z) display-panel resolution (native COM-frame profile) — a display
 # choice, not a calculation grid: the GL theta-nodes sample the star-convex
-# frame and cannot replace it.
+# frame and cannot replace it. Tier-1 call: display density is a consumer
+# choice the cache's u-grid must not dictate.
 N_PROFILE_POINTS = 721
-N_RHO_GRID = 7201   # shape() validity grid — WMMM's N_FOS_RHO_GRID_POINTS
+N_RHO_GRID = 7201   # cache u-grid — WMMM's N_FOS_RHO_GRID_POINTS
 PARAM_KEYS = ("c", "a3", "a4", "a5", "a6", "a7", "a8")
 
 
@@ -35,11 +40,16 @@ class FoSRender:
          for i in range(5, 9)]
     toggles: list[ToggleSpec] = []
 
+    def __init__(self) -> None:
+        # One cache: 7 params, WMMM-parity u-grid, GL-2048 thetas.
+        # Thread-confined: fine — the engine computes on the UI thread only.
+        self._cache = fp.Cache(len(PARAM_KEYS), N_RHO_GRID, nodes.THETA)
+
     def compute(self, params: dict[str, float], toggles: dict[str, bool]) -> ShapeResult:
         arr = [params[k] for k in PARAM_KEYS]
-        shp = fp.shape(arr, N_RHO_GRID)
-        prof = fp.rho_profile(arr, N_PROFILE_POINTS)
-        rd = fp.radius_and_derivative(arr, nodes.THETA, shp.z_shift) if shp.ok else None
+        shp = self._cache.shape(arr)
+        rd = self._cache.radius_and_derivative(arr) if shp.ok else None
+        prof = fp.rho_z_grid(arr, N_PROFILE_POINTS)
         ok = shp.ok and rd is not None and rd.ok and prof.ok
 
         if ok:
@@ -48,34 +58,27 @@ class FoSRender:
             radii = np.zeros(nodes.N_NODES)
             dr_dtheta = np.zeros(nodes.N_NODES)
 
-        if not shp.ok:
-            status, status_name, message = int(shp.status), shp.status.name, shp.message
-        elif rd is not None and not rd.ok:
-            status, status_name, message = int(rd.status), rd.status.name, ""
-        else:
-            status, status_name, message = int(prof.status), prof.status.name, prof.message
+        primary = shp if not shp.ok else (rd if not rd.ok else prof)
 
-        # Draw the neck even for shapes flagged invalid (e.g. not star-convex):
-        # the library computes the neck from the rho(z) profile, independent of
-        # the R(theta) star-convexity gate. Skip only separated shapes (interior
-        # rho <= 0): the fragments have split and the neck radius is 0.
+        # Cylindrical path carries its own rho-negative gate (2.0.0 gating
+        # asymmetry): separated shapes fail inside neck(); non-star-convex
+        # and beak-marginal shapes still yield a lib neck.
         neck_info = None
-        separated = shp.status == fp.Status.ERROR_RHO_NEGATIVE
-        if not separated:
-            nk = fp.neck(arr)
-            if nk.ok and nk.found and nk.rho_neck > 0.0:
-                depth = 0.0
-                if prof.ok:
-                    hit = find_neck_indices(prof.rho)
-                    if hit is not None:
-                        depth = neck_depth(prof.rho, *hit)
-                neck_info = NeckInfo(z=nk.z_neck, rho=nk.rho_neck,
-                                     depth=depth, source="lib")
-        # The FoS shape is COM-centered by definition (rho_profile is the COM
+        nk = self._cache.neck(arr)
+        if nk.ok and nk.found and nk.rho_neck > 0.0:
+            depth = 0.0
+            if prof.ok:
+                hit = find_neck_indices(prof.rho)
+                if hit is not None:
+                    depth = neck_depth(prof.rho, *hit)
+            neck_info = NeckInfo(z=nk.z_neck, rho=nk.rho_neck,
+                                 depth=depth, source="lib")
+        # The FoS shape is COM-centered by definition (rho_z_grid is the COM
         # frame). The R(θ) representation carries the star-convexity shift, so its
         # own COM is offset — the engine draws that overlay separately.
         return ShapeResult(
-            status=status, status_name=status_name, message=message,
+            status=int(primary.status), status_name=primary.status.name,
+            message=primary.message,
             theta=nodes.THETA, radius=radii,
             z=prof.z, rho=prof.rho, drho_dz=prof.drho_dz,
             neck=neck_info,
