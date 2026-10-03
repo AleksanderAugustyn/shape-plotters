@@ -21,24 +21,26 @@ jobs:
           python -m pip install --upgrade build
           python -m build --outdir dist
       - name: Verify wheel in clean venv
-        # The tests run from a copy outside the checkout, so they import the
-        # installed wheel and not the source tree. The timing budgets are
-        # skipped: they are calibrated for a developer machine, not a shared
-        # runner.
+        # Everything runs from a copy of the tests outside the checkout, so
+        # the tests import the installed wheel and not the source tree (and
+        # pip cannot mistake the checkout's egg-info for an installed copy).
+        # The timing budgets are skipped: they are calibrated for a developer
+        # machine, not a shared runner.
         env:
           MPLBACKEND: Agg
         run: |
           python -m venv /tmp/verify-wheel
-          /tmp/verify-wheel/bin/pip install dist/*.whl pytest
           mkdir /tmp/verify-tests
           cp -r tests conftest.py /tmp/verify-tests/
           cd /tmp/verify-tests
+          /tmp/verify-wheel/bin/pip install "$GITHUB_WORKSPACE"/dist/*.whl pytest
           /tmp/verify-wheel/bin/python -m pytest tests -q --ignore=tests/test_perf.py
           /tmp/verify-wheel/bin/shape-plotters --help
       - name: Verify sdist installs from the tarball
         run: |
           python -m venv /tmp/verify-sdist
-          /tmp/verify-sdist/bin/pip install dist/*.tar.gz
+          cd /tmp
+          /tmp/verify-sdist/bin/pip install "$GITHUB_WORKSPACE"/dist/*.tar.gz
           /tmp/verify-sdist/bin/shape-plotters --help
       - uses: actions/upload-artifact@v4
         with:
