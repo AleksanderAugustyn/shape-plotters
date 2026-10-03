@@ -4,6 +4,7 @@ import io
 import matplotlib.pyplot as plt
 import numpy as np
 import pytest
+from matplotlib.backend_bases import ResizeEvent
 from matplotlib.backends.backend_agg import FigureCanvasAgg
 
 from shape_plotters.core.engine import ShapePlotterApp
@@ -188,6 +189,38 @@ def test_lost_release_ends_drag_mode_on_the_next_update(make_app) -> None:
     assert not app._blitter.active and animated(app) == []
     reference = make_app(BetaRender, beta2=0.9, beta3=0.1)
     assert np.array_equal(pixels(app), pixels(reference))
+
+
+def test_drag_on_another_slider_after_a_lost_release_moves_that_slider(make_app) -> None:
+    # beta2's release never arrived, so it is still drag_active when beta3 is
+    # pressed. Drag mode must follow beta3: blitting with beta2's axes
+    # animated would leave beta3's handle frozen in the background.
+    app = make_app(BetaRender, beta2=1.0)
+    for value in begin_drag(app, "beta2", steps(1.0, 0.9, -0.01)):
+        move(app, "beta2", value)
+    values = steps(0.0, 0.1, 0.01)
+    press(app, "beta3", values[0])
+    for value in values[1:]:
+        move(app, "beta3", value)
+        frame = pixels(app)
+        app.fig.canvas.draw()
+        assert np.array_equal(frame, pixels(app)), f"frame at beta3={value}"
+
+
+def test_resize_mid_drag_never_blits_the_old_background(make_app) -> None:
+    # A Tk window resize changes the figure size and fires resize_event, but
+    # its redraw is only scheduled; a motion event can arrive first and must
+    # not blit the old-size background into the new-size canvas.
+    app = make_app(BetaRender, beta2=1.0)
+    rest = begin_drag(app, "beta2", steps(1.0, 0.9, -0.01))
+    width, height = app.fig.get_size_inches()
+    app.fig.set_size_inches(width * 1.2, height * 1.2, forward=False)
+    ResizeEvent("resize_event", app.fig.canvas)._process()
+    for value in rest:
+        move(app, "beta2", value)
+        frame = pixels(app)
+        app.fig.canvas.draw()
+        assert np.array_equal(frame, pixels(app)), f"frame at beta2={value}"
 
 
 def test_export_mid_drag_does_not_poison_later_frames(make_app) -> None:

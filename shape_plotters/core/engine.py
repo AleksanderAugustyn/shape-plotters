@@ -65,6 +65,7 @@ class ShapePlotterApp:
         self._blitter = (DragBlitter(self.fig, self._dynamic)
                          if self.fig.canvas.supports_blit else None)
         self._drag_pending = None   # slider whose press was drawn the ordinary way
+        self._dragged = None        # slider the blitter was begun on
         self.fig.canvas.mpl_connect("button_release_event", self._on_release)
         self.update()
 
@@ -441,10 +442,15 @@ class ShapePlotterApp:
                 self._end_drag()
             return False
         if self._blitter.active:
-            return True
+            if slider is self._dragged:
+                return True
+            # A stale drag after a lost release, and another slider pressed:
+            # blitting on would keep the new slider frozen in the background.
+            self._end_drag()
         if self._drag_pending is not slider:
             self._drag_pending = slider
             return False
+        self._dragged = slider
         self._blitter.begin(slider.ax)
         return True
 
