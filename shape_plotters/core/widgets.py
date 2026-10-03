@@ -52,6 +52,13 @@ class IntTextBox:
             # keeping the intended stop-typing-on-resize behavior.
             fig.canvas.mpl_disconnect(self.box._cids[-1])
             fig.canvas.mpl_connect("resize_event", lambda _e: self.box.stop_typing())
+        # TextBox.stop_typing() redraws the whole figure on every mouse press
+        # outside the box, typing or not. With the Z and N boxes that is two
+        # full redraws per click anywhere in the figure, so only stop when
+        # the box is actually being typed in.
+        stop_typing = self.box.stop_typing
+        self.box.stop_typing = (
+            lambda: stop_typing() if self.box.capturekeystrokes else None)
         self.value = int(initial)
         self._on_change = on_change
         self.box.on_submit(self._submit)
