@@ -14,7 +14,7 @@ class _SpyApp:
 
     instances: list["_SpyApp"] = []
 
-    def __init__(self, render) -> None:
+    def __init__(self, render: object) -> None:
         self.render = render
         self.ran = False
         _SpyApp.instances.append(self)

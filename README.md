@@ -95,5 +95,6 @@ workflow builds, tests and publishes to PyPI.
 
 ## License
 
-MIT, see [LICENSE](LICENSE). Changes are recorded in
-[CHANGELOG.md](CHANGELOG.md).
+MIT, see [LICENSE](https://github.com/AleksanderAugustyn/shape-plotters/blob/master/LICENSE).
+Changes are recorded in
+[CHANGELOG.md](https://github.com/AleksanderAugustyn/shape-plotters/blob/master/CHANGELOG.md).

@@ -11,8 +11,9 @@ license-files = ["LICENSE"]
 requires-python = ">=3.10"
 dependencies = [
     "numpy>=2.0",
-    "scipy>=1.11",
-    "matplotlib>=3.8",
+    # First releases that install alongside numpy 2.
+    "scipy>=1.13",
+    "matplotlib>=3.8.4",
     # Exact pins: each render is written against one library API version.
     "beta-parameterization==4.0.1",
     "fos-parameterization==3.0.0",
