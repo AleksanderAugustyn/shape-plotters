@@ -168,9 +168,8 @@ def test_energy_requests_single_without_overlay(render: BetaRender) -> None:
     assert res.overlay_z is None
     (req,) = render.energy_requests(p, res)
     assert (req.label, req.param_type, req.com_correction) == ("slider", "legendre", False)
-    assert len(req.shape) == 20                      # WMMM's legendre width
-    assert req.shape[:8] == (0.0, 0.30, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
-    assert req.shape[8:] == (0.0,) * 12              # zero-padded tail
+    assert len(req.shape) == 8                       # WMMM's legendre width
+    assert req.shape == (0.0, 0.30, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
 
 
 def test_energy_requests_both_with_overlay(render: BetaRender) -> None:

@@ -28,8 +28,8 @@ from src.core.neck import find_neck_indices, neck_depth
 from src.core.result import EnergyRequest, NeckInfo, ShapeResult, SliderSpec
 
 N_BETAS = 8
-# WMMM's legendre parameterization takes 20 betas; sliders drive the first 8.
-WMMM_N_LEGENDRE_PARAMS = 20
+# WMMM's legendre parameterization takes 8 betas, all slider-driven.
+WMMM_N_LEGENDRE_PARAMS = 8
 # The COM-corrected shape coincides with the slider shape when the corrected
 # dipole equals the slider beta1 (beta10 is a shape parameter, not a
 # translation knob); below this |corrected_beta10 - beta1| the orange overlay

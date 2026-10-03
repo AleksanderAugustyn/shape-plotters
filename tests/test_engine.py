@@ -266,7 +266,7 @@ def test_energy_click_appends_block_and_any_change_clears(monkeypatch) -> None:
     a._on_energy()
     text = a.stats_text.get_text()
     assert "WMMM [MeV]:" in text and "E_total = 2.0000" in text
-    assert calls == [("legendre", 92, 144, (0.0,) * 20, False)]  # sphere: 1 request
+    assert calls == [("legendre", 92, 144, (0.0,) * 8, False)]  # sphere: 1 request
     a.rows["beta2"].slider.set_val(0.3)          # slider change clears
     assert "WMMM" not in a.stats_text.get_text()
     a._on_energy()
