@@ -40,32 +40,25 @@ sliders are practical limits.
 - Python 3.10 or newer with a matplotlib GUI backend. Tk is the default
   (`python3-tk` on Debian/Ubuntu).
 
-## Setup
+## Install
 
-    git clone https://github.com/AleksanderAugustyn/shape-plotters.git
-    cd shape-plotters
-    python3 -m venv .venv
-    source .venv/bin/activate
-    pip install numpy scipy matplotlib pytest
-    pip install -r requirements-libs.txt
+    pip install shape-plotters
 
-The parameterization libraries install from PyPI as prebuilt wheels (Fortran
-shared library and libgfortran bundled), pinned in `requirements-libs.txt`.
+or `pipx install shape-plotters` to get the command without touching another
+environment. The parameterization libraries come along as prebuilt wheels
+(Fortran shared library and libgfortran bundled), pinned to the exact versions
+each render is written against.
 
-### WSL
-
-Keep the virtual environment on the Linux filesystem, not under `/mnt/c`. The
-Windows drive is a 9P mount; a venv there makes matplotlib rendering sluggish
-(~5× slower). If the repo lives under `/mnt/c`, create the venv in your Linux
-home instead:
-
-    python3 -m venv ~/.venvs/shape-plotters
-    source ~/.venvs/shape-plotters/bin/activate
+Under WSL, keep the virtual environment on the Linux filesystem, not under
+`/mnt/c`. The Windows drive is a 9P mount; a venv there makes matplotlib
+rendering sluggish (~5× slower).
 
 ## Run
 
-    python main.py beta
-    python main.py fos
+    shape-plotters beta
+    shape-plotters fos
+
+`python -m shape_plotters beta` does the same.
 
 ## Energy button
 
@@ -75,25 +68,33 @@ not a dependency: without it the button is absent and nothing else changes.
 This repository contains the calling convention only, no model code, data or
 output.
 
-## Layout
+## Development
 
-    main.py              entry point: python main.py beta|fos
-    src/core/            engine, widgets, quadrature, neck and fragment helpers
-    src/core/result.py   the render contract (what a render gives the engine)
-    src/renders/         one module per parameterization
-    tests/               pytest suite, including frame-time budgets
-
-A new parameterization is a new module in `src/renders/` that implements the
-contract in `src/core/result.py`, plus one entry in `main.py`. The engine
-needs no change.
-
-## Tests
-
+    git clone https://github.com/AleksanderAugustyn/shape-plotters.git
+    cd shape-plotters
+    python3 -m venv ~/.venvs/shape-plotters
+    source ~/.venvs/shape-plotters/bin/activate
+    pip install -e ".[test]"
     python -m pytest
 
-The WMMM smoke tests skip when `wmmm` is not installed.
+The WMMM smoke tests skip when `wmmm` is not installed. The frame-time budgets
+in `tests/test_perf.py` assume a venv on the Linux filesystem.
+
+    shape_plotters/cli.py          entry point and render registry
+    shape_plotters/core/           engine, widgets, quadrature, neck and fragment helpers
+    shape_plotters/core/result.py  the render contract (what a render gives the engine)
+    shape_plotters/renders/        one module per parameterization
+    tests/                         pytest suite, including frame-time budgets
+
+A new parameterization is a new module in `shape_plotters/renders/` that
+implements the render contract, plus one registry entry in `cli.py` and a
+pinned library in `pyproject.toml`. The engine needs no change.
+
+Releases are cut by pushing a version tag such as `0.1.0`; the `wheels`
+workflow builds, tests and publishes to PyPI.
 
 ## License
 
-MIT, see [LICENSE](LICENSE). Changes are recorded in
-[CHANGELOG.md](CHANGELOG.md).
+MIT, see [LICENSE](https://github.com/AleksanderAugustyn/shape-plotters/blob/master/LICENSE).
+Changes are recorded in
+[CHANGELOG.md](https://github.com/AleksanderAugustyn/shape-plotters/blob/master/CHANGELOG.md).

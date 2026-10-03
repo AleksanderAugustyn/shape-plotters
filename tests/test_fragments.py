@@ -2,7 +2,7 @@
 import numpy as np
 import pytest
 
-from src.core import fragments, nodes
+from shape_plotters.core import fragments, nodes
 
 # Unit sphere sampled on the shared GL nodes: z = cos θ, rho = sin θ.
 Z = nodes.X.copy()            # descending +1 -> -1

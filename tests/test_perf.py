@@ -21,9 +21,9 @@ import time
 
 import pytest
 
-from src.core.engine import ShapePlotterApp
-from src.renders.beta import BetaRender
-from src.renders.fos import FoSRender
+from shape_plotters.core.engine import ShapePlotterApp
+from shape_plotters.renders.beta import BetaRender
+from shape_plotters.renders.fos import FoSRender
 
 MUTATION_BUDGET_MS = 5.0
 FRAME_BUDGET_MS = 250.0

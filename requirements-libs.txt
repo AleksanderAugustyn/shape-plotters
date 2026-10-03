@@ -1,2 +1,0 @@
-beta-parameterization==4.0.1
-fos-parameterization==3.0.0

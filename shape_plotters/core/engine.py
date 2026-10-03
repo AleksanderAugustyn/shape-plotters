@@ -2,7 +2,7 @@
 
 Owns display units (fm/R0 toggle; ShapeResult is R0 units), layout, widgets,
 invalid-shape greying, stats, and save. Everything shape-specific comes from
-the render (contract in src/core/result.py).
+the render (contract in shape_plotters/core/result.py).
 
 Artists are created once at build; update() only mutates data, text, and
 visibility. v0.1 cleared and replotted every axes per slider event — legend
@@ -15,9 +15,9 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.widgets import Button, CheckButtons
 
-from src.core import energy, fragments, quadrature
-from src.core.result import ShapeResult
-from src.core.widgets import IntTextBox, SliderRow
+from shape_plotters.core import energy, fragments, quadrature
+from shape_plotters.core.result import ShapeResult
+from shape_plotters.core.widgets import IntTextBox, SliderRow
 
 # Display convention (both old plotters used 1.16); distinct from WMMM physics constants.
 R0_FM = 1.16

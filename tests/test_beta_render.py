@@ -3,8 +3,8 @@ import numpy as np
 import pytest
 import beta_parameterization as bp
 
-from src.core import nodes, quadrature
-from src.renders.beta import BetaRender
+from shape_plotters.core import nodes, quadrature
+from shape_plotters.renders.beta import BetaRender
 
 # Probed lib-VALID and necked (carried over from v0.1).
 NECKED_BETAS = [0.0, 1.5, 0.0, 0.8]

@@ -2,9 +2,9 @@
 import numpy as np
 import pytest
 
-from src.core.engine import INVALID_COLOR, R0_FM, ShapePlotterApp
-from src.renders.beta import BetaRender
-from src.renders.fos import FoSRender
+from shape_plotters.core.engine import INVALID_COLOR, R0_FM, ShapePlotterApp
+from shape_plotters.renders.beta import BetaRender
+from shape_plotters.renders.fos import FoSRender
 
 
 @pytest.fixture(params=[BetaRender, FoSRender], ids=["beta", "fos"])
@@ -249,7 +249,7 @@ def test_beta_com_overlay_when_asymmetric() -> None:
 # --- WMMM energy button (stub adapter — no real WMMM anywhere) ---
 
 def _fake_energy_result(**overrides):
-    from src.core.energy import EnergyResult
+    from shape_plotters.core.energy import EnergyResult
     base = dict(is_valid=True, mass_excess=1.0, total_energy=2.0,
                 macro_energy=3.0, micro_energy=4.0, surface_energy=5.0,
                 coulomb_energy=6.0, proton_pairing_gap=7.0,
@@ -260,7 +260,7 @@ def _fake_energy_result(**overrides):
 
 
 def test_energy_button_absent_when_unavailable(monkeypatch) -> None:
-    monkeypatch.setattr("src.core.engine.energy.available", lambda: False)
+    monkeypatch.setattr("shape_plotters.core.engine.energy.available", lambda: False)
     a = ShapePlotterApp(BetaRender())
     assert a.btn_energy is None
     assert "WMMM" not in a.stats_text.get_text()
@@ -269,14 +269,14 @@ def test_energy_button_absent_when_unavailable(monkeypatch) -> None:
 
 
 def test_energy_click_appends_block_and_any_change_clears(monkeypatch) -> None:
-    monkeypatch.setattr("src.core.engine.energy.available", lambda: True)
+    monkeypatch.setattr("shape_plotters.core.engine.energy.available", lambda: True)
     calls = []
 
     def fake_compute(param_type, z, n, shape, com_correction=True):
         calls.append((param_type, z, n, tuple(shape), com_correction))
         return _fake_energy_result()
 
-    monkeypatch.setattr("src.core.engine.energy.compute", fake_compute)
+    monkeypatch.setattr("shape_plotters.core.engine.energy.compute", fake_compute)
     a = ShapePlotterApp(BetaRender())
     assert a.btn_energy is not None
     a._on_energy()
@@ -294,8 +294,8 @@ def test_energy_click_appends_block_and_any_change_clears(monkeypatch) -> None:
 
 
 def test_energy_two_labeled_blocks_when_overlay(monkeypatch) -> None:
-    monkeypatch.setattr("src.core.engine.energy.available", lambda: True)
-    monkeypatch.setattr("src.core.engine.energy.compute",
+    monkeypatch.setattr("shape_plotters.core.engine.energy.available", lambda: True)
+    monkeypatch.setattr("shape_plotters.core.engine.energy.compute",
                         lambda *a, **k: _fake_energy_result())
     a = ShapePlotterApp(BetaRender())
     a.rows["beta3"].slider.set_val(0.4)          # asymmetric -> overlay present
@@ -309,9 +309,9 @@ def test_energy_two_labeled_blocks_when_overlay(monkeypatch) -> None:
 
 
 def test_energy_invalid_shape_not_computed(monkeypatch) -> None:
-    monkeypatch.setattr("src.core.engine.energy.available", lambda: True)
+    monkeypatch.setattr("shape_plotters.core.engine.energy.available", lambda: True)
     calls = []
-    monkeypatch.setattr("src.core.engine.energy.compute",
+    monkeypatch.setattr("shape_plotters.core.engine.energy.compute",
                         lambda *a, **k: calls.append(a) or _fake_energy_result())
     a = ShapePlotterApp(BetaRender())
     a.rows["beta2"].slider.set_val(4.0)          # interior negative -> invalid
@@ -323,13 +323,13 @@ def test_energy_invalid_shape_not_computed(monkeypatch) -> None:
 
 
 def test_energy_error_and_invalid_results_render(monkeypatch) -> None:
-    monkeypatch.setattr("src.core.engine.energy.available", lambda: True)
-    monkeypatch.setattr("src.core.engine.energy.compute",
+    monkeypatch.setattr("shape_plotters.core.engine.energy.available", lambda: True)
+    monkeypatch.setattr("shape_plotters.core.engine.energy.compute",
                         lambda *a, **k: _fake_energy_result(is_valid=False))
     a = ShapePlotterApp(BetaRender())
     a._on_energy()
     assert "WMMM: invalid shape" in a.stats_text.get_text()
-    monkeypatch.setattr("src.core.engine.energy.compute",
+    monkeypatch.setattr("shape_plotters.core.engine.energy.compute",
                         lambda *a, **k: _fake_energy_result(error="boom"))
     a._on_energy()
     text = a.stats_text.get_text()

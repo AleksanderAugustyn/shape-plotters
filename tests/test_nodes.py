@@ -2,7 +2,7 @@
 import numpy as np
 import pytest
 
-from src.core import nodes
+from shape_plotters.core import nodes
 
 
 def test_shapes_and_ordering() -> None:

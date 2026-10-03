@@ -10,9 +10,9 @@ import math
 
 import pytest
 
-from src.core import energy
-from src.renders.beta import BetaRender
-from src.renders.fos import FoSRender
+from shape_plotters.core import energy
+from shape_plotters.renders.beta import BetaRender
+from shape_plotters.renders.fos import FoSRender
 
 pytestmark = pytest.mark.skipif(
     not energy.available(),

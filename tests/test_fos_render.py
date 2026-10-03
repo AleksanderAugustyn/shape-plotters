@@ -2,8 +2,8 @@
 import numpy as np
 import pytest
 
-from src.core import nodes
-from src.renders.fos import FoSRender
+from shape_plotters.core import nodes
+from shape_plotters.renders.fos import FoSRender
 
 SPHERE = {"c": 1.0, "a3": 0.0, "a4": 0.0, "a5": 0.0, "a6": 0.0, "a7": 0.0, "a8": 0.0}
 # Probed lib-VALID necked shape (carried over from v0.1).
@@ -104,7 +104,7 @@ def test_slider_specs_and_filename(render: FoSRender) -> None:
 
 
 def test_energy_requests_always_single() -> None:
-    from src.renders.fos import FoSRender
+    from shape_plotters.renders.fos import FoSRender
     render = FoSRender()
     p = dict(c=2.0, a3=0.2, a4=0.6, a5=0.0, a6=0.0, a7=0.0, a8=0.0)
     res = render.compute(p, {})

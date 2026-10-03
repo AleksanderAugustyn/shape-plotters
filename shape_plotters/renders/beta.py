@@ -1,13 +1,13 @@
 """Beta (Legendre) render over the beta_parameterization package.
 
 GL-native: R(theta) and analytic dR/dtheta come from the library's cached
-tier evaluated on the shared GL-2048 primary theta set (src/core/nodes.py) —
+tier evaluated on the shared GL-2048 primary theta set (shape_plotters/core/nodes.py) —
 in sync with the energy model's dense grid. One read-only cache serves every
 call; each call resolves from its betas, so the cache may be shared across
 threads. Volume conservation and the COM correction are per-call library
 options: radii, dR/dtheta and the polar radii arrive pre-scaled, and
 resolve_shape reports the applied volume_factor. The neck is
-the Python display-only heuristic (src/core/neck.py) — graduating it into the
+the Python display-only heuristic (shape_plotters/core/neck.py) — graduating it into the
 library is recorded future work.
 
 Two shapes are drawn. The default (blue) shape uses beta10 (= the beta1 slider,
@@ -25,9 +25,9 @@ from __future__ import annotations
 import numpy as np
 import beta_parameterization as bp
 
-from src.core import nodes, quadrature
-from src.core.neck import find_neck_indices, neck_depth
-from src.core.result import EnergyRequest, NeckInfo, ShapeResult, SliderSpec
+from shape_plotters.core import nodes, quadrature
+from shape_plotters.core.neck import find_neck_indices, neck_depth
+from shape_plotters.core.result import EnergyRequest, NeckInfo, ShapeResult, SliderSpec
 
 N_BETAS = 8
 # WMMM's legendre parameterization takes 8 betas, all slider-driven.

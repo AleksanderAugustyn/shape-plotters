@@ -2,7 +2,7 @@
 
 rho(z)-native (lib-exact drho_dz, lib-native neck); R(theta) and analytic
 dR/dtheta come from the library's cached tier on the shared GL-2048 set
-(src/core/nodes.py) — in sync with the energy model's dense grid. The cache
+(shape_plotters/core/nodes.py) — in sync with the energy model's dense grid. The cache
 evaluates R(theta) in the total-shift frame internally, so no z_shift
 plumbing. Neck position/radius are lib values on the cache's u-grid; only
 the displayed depth reuses the shared peak analysis on the display profile.
@@ -18,9 +18,9 @@ from __future__ import annotations
 import numpy as np
 import fos_parameterization as fp
 
-from src.core import nodes
-from src.core.neck import find_neck_indices, neck_depth
-from src.core.result import EnergyRequest, NeckInfo, ShapeResult, SliderSpec, ToggleSpec
+from shape_plotters.core import nodes
+from shape_plotters.core.neck import find_neck_indices, neck_depth
+from shape_plotters.core.result import EnergyRequest, NeckInfo, ShapeResult, SliderSpec, ToggleSpec
 
 # rho(z) display-panel resolution (native COM-frame profile) — a display
 # choice, not a calculation grid: the GL theta-nodes sample the star-convex

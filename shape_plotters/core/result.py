@@ -47,7 +47,7 @@ class EnergyRequest:
 
     Renders own the physics semantics (how many shapes are on screen and in
     which parameter convention); the engine just iterates requests. Carries
-    no wmmm dependency — src/core/energy.py resolves it.
+    no wmmm dependency — shape_plotters/core/energy.py resolves it.
     """
     label: str                 # stats-block header; mirrors the plot legend
     param_type: str            # "legendre" | "fos"
@@ -68,7 +68,7 @@ class ShapeResult:
     status: int                    # 0 = valid; engine greys the plot otherwise
     status_name: str               # symbolic name from the package Status IntEnum
     message: str
-    theta: Array                   # shared GL node set (src/core/nodes.py)
+    theta: Array                   # shared GL node set (shape_plotters/core/nodes.py)
     radius: Array                  # R(theta), R0 units
     z: Array                       # profile axis, R0 units
     rho: Array                     # rho(z), R0 units

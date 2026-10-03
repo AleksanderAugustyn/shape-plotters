@@ -3,7 +3,7 @@ minimum between them, no fixed 90-degree split (the spec's asymmetric case)."""
 import numpy as np
 import pytest
 
-from src.core.neck import find_neck_indices, neck_depth
+from shape_plotters.core.neck import find_neck_indices, neck_depth
 
 X = np.linspace(0.0, np.pi, 721)
 

@@ -2,7 +2,7 @@
 import matplotlib.pyplot as plt
 import pytest
 
-from src.core.widgets import IntTextBox, SliderRow
+from shape_plotters.core.widgets import IntTextBox, SliderRow
 
 
 @pytest.fixture()
