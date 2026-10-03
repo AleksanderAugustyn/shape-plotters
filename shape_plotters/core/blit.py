@@ -35,6 +35,9 @@ class DragBlitter:
         self._slider_ax: Axes | None = None
         self._background = None
         fig.canvas.mpl_connect("draw_event", self._on_draw)
+        # A window resize only schedules its redraw; a motion event handled
+        # before it must not blit the old-size background.
+        fig.canvas.mpl_connect("resize_event", lambda _event: self.invalidate())
 
     @property
     def active(self) -> bool:
