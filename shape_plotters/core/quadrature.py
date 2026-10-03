@@ -1,4 +1,4 @@
-"""GL dot-product shape integrals on the shared node set (src/core/nodes.py).
+"""GL dot-product shape integrals on the shared node set (shape_plotters/core/nodes.py).
 
 Spectrally exact — the same scheme as WMMM's dense set: every integrand
 carries a sin(theta) factor that the x = cos(theta) substitution absorbs.
@@ -9,8 +9,8 @@ from __future__ import annotations
 
 import numpy as np
 
-from src.core import nodes
-from src.core.result import Array
+from shape_plotters.core import nodes
+from shape_plotters.core.result import Array
 
 
 def _require_node_set(theta: Array) -> None:

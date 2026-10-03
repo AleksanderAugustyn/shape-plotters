@@ -1,9 +1,9 @@
 """Cylindrical fragment volumes about the neck plane.
 
-The neck (src/core/neck.py, or a library-native neck) splits a necked shape
+The neck (shape_plotters/core/neck.py, or a library-native neck) splits a necked shape
 into two pre-fragments. Their volumes are the disk integrals V = pi * ∫ rho(z)^2
 dz on each side of z_neck — the cylindrical form, distinct from the whole-body
-spherical integral in src/core/quadrature.py, which integrates the entire body
+spherical integral in shape_plotters/core/quadrature.py, which integrates the entire body
 and cannot be split at a z-plane. Works for any rho(z) profile: FoS's lib-native
 one and beta's parametric z = R cos θ, rho = R sin θ alike.
 """
@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from src.core.result import Array
+from shape_plotters.core.result import Array
 
 
 def fragment_volumes(z: Array, rho: Array, z_neck: float,

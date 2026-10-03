@@ -2,7 +2,7 @@
 import numpy as np
 import pytest
 
-from src.core import nodes, quadrature
+from shape_plotters.core import nodes, quadrature
 
 THETA = nodes.THETA
 ONES = np.ones(nodes.N_NODES)

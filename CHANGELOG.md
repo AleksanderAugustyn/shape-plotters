@@ -2,16 +2,19 @@
 
 Notable changes to shape-plotters. Versions follow semantic versioning.
 
-## Unreleased
+## 0.1.0
 
-Nothing has been released yet. The first tagged release will be 0.1.0 and
-will carry everything below.
+First release.
 
 ### Added
 
-- **Shared engine, one render per parameterization.** `python main.py beta`
-  and `python main.py fos` open the same interactive figure; everything
-  shape-specific comes from the render (contract in `src/core/result.py`).
+- **Installable package.** `pip install shape-plotters` provides the
+  `shape-plotters` command; the parameterization libraries are pinned
+  dependencies.
+- **Shared engine, one render per parameterization.** `shape-plotters beta`
+  and `shape-plotters fos` open the same interactive figure; everything
+  shape-specific comes from the render (contract in
+  `shape_plotters/core/result.py`).
 - **Beta render** over beta-parameterization 4.0.1: sliders β1–β8, volume
   conserved by the library. An orange overlay shows the centre-of-mass
   corrected shape whenever its β1 differs from the slider value; a corrected

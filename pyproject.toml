@@ -1,9 +1,40 @@
+[build-system]
+requires = ["setuptools>=77", "setuptools_scm>=8"]
+build-backend = "setuptools.build_meta"
+
 [project]
 name = "shape-plotters"
-version = "0.1.0"
-description = "Interactive matplotlib plotters for nuclear shape parameterizations (beta, FoS)"
+description = "Interactive matplotlib plotters for axially symmetric nuclear shapes (beta, FoS)"
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
 requires-python = ">=3.10"
-dependencies = ["numpy>=2.0", "scipy>=1.11", "matplotlib>=3.8"]
+dependencies = [
+    "numpy>=2.0",
+    "scipy>=1.11",
+    "matplotlib>=3.8",
+    # Exact pins: each render is written against one library API version.
+    "beta-parameterization==4.0.1",
+    "fos-parameterization==3.0.0",
+]
+dynamic = ["version"]
+
+[project.optional-dependencies]
+test = ["pytest>=7"]
+
+[project.scripts]
+shape-plotters = "shape_plotters.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/AleksanderAugustyn/shape-plotters"
+Repository = "https://github.com/AleksanderAugustyn/shape-plotters"
+Changelog = "https://github.com/AleksanderAugustyn/shape-plotters/blob/master/CHANGELOG.md"
+
+[tool.setuptools.packages.find]
+include = ["shape_plotters*"]
+
+# Version from git tags (setuptools_scm), as in the parameterization libraries.
+[tool.setuptools_scm]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

@@ -13,7 +13,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from src.core import energy
+from shape_plotters.core import energy
 
 
 def _install_stub(monkeypatch, log: list) -> types.ModuleType:
