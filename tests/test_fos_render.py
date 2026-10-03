@@ -65,6 +65,7 @@ def test_invalid_c_returns_status_not_exception(render: FoSRender) -> None:
     assert res.neck is None
     assert res.radius.shape == (nodes.N_NODES,) and not res.radius.any()
     assert res.dr_dtheta.shape == (nodes.N_NODES,) and not res.dr_dtheta.any()
+    assert not res.rho.any()                        # not separated: profile stays zero-filled
 
 
 def test_invalid_not_star_convex_still_has_neck(render: FoSRender) -> None:
@@ -80,16 +81,18 @@ def test_invalid_not_star_convex_still_has_neck(render: FoSRender) -> None:
     assert res.neck.rho > 0.0
 
 
-def test_separated_shape_has_no_neck(render: FoSRender) -> None:
-    # Interior rho <= 0: the body has split, so the neck radius is 0 by
-    # definition and no neck line should be drawn.
+def test_separated_shape_draws_fragments_without_neck(render: FoSRender) -> None:
+    # Interior rho <= 0: the body has split. No neck line (its radius is 0 by
+    # definition), but the profile draws both fragments from the unchecked
+    # profile (rho = 0 in the void) while the verdict stays the checked one.
     res = render.compute({**SPHERE, "c": 2.5, "a4": 1.2}, {})
-    # 2.0.0 gate precedence: the beak verdict is checked before the rho scan,
-    # so a shape that is both rho-negative and beak-failing reports the beak.
-    # The neck must still be absent: the cylindrical path rejects it with
-    # rho_negative inside neck() itself.
+    # Gate precedence: the beak verdict is checked before the rho scan, so a
+    # shape that is both rho-negative and beak-failing reports the beak.
+    assert not res.ok
     assert res.status_name == "beak_singularity"
     assert res.neck is None
+    assert res.rho.max() > 0.0                      # fragments drawn
+    assert (res.rho[1:-1] == 0.0).any()             # the void between them
 
 
 def test_slider_specs_and_filename(render: FoSRender) -> None:
