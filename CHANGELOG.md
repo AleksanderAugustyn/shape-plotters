@@ -2,6 +2,23 @@
 
 Notable changes to shape-plotters. Versions follow semantic versioning.
 
+## 0.2.0
+
+Interactive performance. Measured in a real window on the development PC
+(matplotlib 3.11): a drag step drops from about 110 ms to 33-46 ms, a click
+on a slider from about 300 ms to about 105 ms.
+
+### Changed
+
+- **Slider drags are blitted.** While a slider is dragged, only the curves,
+  the stats text and that slider are redrawn; ticks, legends and the other
+  widgets come from a cached background. The axes hold still during the drag
+  and refit on release; if the shape outgrows the view, the view jumps out
+  once to a looser fit. During a drag the curves draw on top of legends.
+  Everything outside a drag, including saved PNGs, is drawn exactly as before.
+- **A click costs one redraw instead of three.** Every mouse press used to
+  trigger two extra full redraws, one per Z/N text box.
+
 ## 0.1.0
 
 First release.

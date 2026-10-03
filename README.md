@@ -33,6 +33,10 @@ boxes (R₀ = 1.16 A^(1/3) fm), Reset, and Save (300 dpi PNG named after the
 parameters, written to the current directory). Red dotted marks on the FoS
 sliders are practical limits.
 
+While a slider is dragged the axes hold still, so the shape visibly changes
+instead of the axes rescaling around it; they refit when the mouse is
+released. If the shape outgrows the view mid-drag, the view jumps out once.
+
 ## Requirements
 
 - Linux x86-64. The parameterization libraries ship manylinux wheels only;

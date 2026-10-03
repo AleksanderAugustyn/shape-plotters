@@ -8,14 +8,24 @@ Artists are created once at build; update() only mutates data, text, and
 visibility. v0.1 cleared and replotted every axes per slider event — legend
 and text layout made that the frame-time bottleneck (see
 docs/superpowers/specs/2026-07-03-engine-v0.2-performance-design.md).
+
+A full-figure redraw is still ~100 ms, almost all of it ticks, legends and
+widget axes that do not change. While a slider is dragged, update() therefore
+blits: the static layer comes from a cached background (blit.py) and only the
+dynamic artists and the dragged slider are drawn. Everything outside a drag
+takes the ordinary full-draw path, so a settled figure is pixel-identical to
+one that was never dragged (see
+docs/superpowers/specs/2026-10-03-engine-v0.3-blitting-design.md).
 """
 from __future__ import annotations
 
 import numpy as np
 import matplotlib.pyplot as plt
+from matplotlib.axes import Axes
 from matplotlib.widgets import Button, CheckButtons
 
 from shape_plotters.core import energy, fragments, quadrature
+from shape_plotters.core.blit import DragBlitter
 from shape_plotters.core.result import ShapeResult
 from shape_plotters.core.widgets import IntTextBox, SliderRow
 
@@ -33,6 +43,10 @@ UNITS_LABEL = "fm units"
 # R0 = 1.16 fm equals WMMM's geometric R0; see FORD.md / v0.2 handoff).
 SCISSION_BAND_FM = (1.2, 1.5)
 
+# Headroom of a mid-drag refit, as an autoscale margin: when a dragged shape
+# outgrows the held view, the view jumps out this far so the next frames fit.
+DRAG_MARGIN = 0.25
+
 
 class ShapePlotterApp:
     def __init__(self, render) -> None:
@@ -47,6 +61,12 @@ class ShapePlotterApp:
         self._build_figure()
         self._build_artists()
         self._build_widgets()
+        # Blitted slider drags; None where the canvas cannot blit.
+        self._blitter = (DragBlitter(self.fig, self._dynamic)
+                         if self.fig.canvas.supports_blit else None)
+        self._drag_pending = None   # slider whose press was drawn the ordinary way
+        self._dragged = None        # slider the blitter was begun on
+        self.fig.canvas.mpl_connect("button_release_event", self._on_release)
         self.update()
 
     # ---------- construction ----------
@@ -66,6 +86,8 @@ class ShapePlotterApp:
         self.ax_extra = self.fig.add_subplot(gs[2]) if self.render.has_extra_panel else None
         self.ax_stats = self.fig.add_subplot(gs[ncols])
         self.ax_stats.axis("off")
+        self._data_axes = tuple(
+            ax for ax in (self.ax_radius, self.ax_shape, self.ax_extra) if ax is not None)
 
     def _build_artists(self) -> None:
         # fm_units defaults to True; the unit toggle re-texts labels in place.
@@ -131,6 +153,16 @@ class ShapePlotterApp:
         self.stats_text = self.ax_stats.text(
             0.0, 1.0, "", va="top", family="monospace", fontsize=12,
             transform=self.ax_stats.transAxes)
+
+        # Everything update() mutates per frame. The rest of the figure is the
+        # static layer that a blitted drag frame reuses.
+        dynamic = [self.r_line, self.dr_line, self.shape_upper, self.shape_lower,
+                   self.neck_line, self.zcm_point, self.rtheta_upper,
+                   self.rtheta_lower, self.rtheta_zcm, self.stats_text]
+        if self.ax_extra is not None:
+            dynamic += [self.extra_rho, self.extra_drho, self.zcm_extra]
+        self._dynamic = tuple(dynamic)
+        self._rest_margins = {ax: ax.margins() for ax in self._data_axes}
 
     def _build_widgets(self) -> None:
         self.rows: dict[str, SliderRow] = {}
@@ -229,6 +261,9 @@ class ShapePlotterApp:
             self.rows[spec.key].slider.set_val(spec.vinit)
 
     def _save(self, _event=None) -> None:
+        # A drag whose release never arrived must not leak its held view into
+        # the file: leave drag mode first.
+        self._on_release(None)
         params = {k: row.slider.val for k, row in self.rows.items()}
         fname = self.render.filename(self.z_box.value, self.n_box.value, params)
         self.fig.savefig(fname, dpi=300, bbox_inches="tight")
@@ -281,6 +316,8 @@ class ShapePlotterApp:
         return R0_FM * float(self.z_box.value + self.n_box.value) ** (1.0 / 3.0)
 
     def update(self, _val=None) -> None:
+        dragging = self._sync_drag_mode()
+        static_before = (self.ax_shape.get_title(), self.shape_legend.get_visible())
         params = {k: row.slider.val for k, row in self.rows.items()}
         result = self.render.compute(params, self.toggle_state)
         self.last_result = result
@@ -382,12 +419,97 @@ class ShapePlotterApp:
         self._energy_lines = []   # any shape/Z/N/unit change invalidates energies
         self._refresh_stats()
 
-        # visible_only: the hidden neck line keeps stale data by design.
-        for ax in (self.ax_radius, self.ax_shape, self.ax_extra):
-            if ax is not None:
+        static_changed = static_before != (
+            self.ax_shape.get_title(), self.shape_legend.get_visible())
+        self._present(dragging, static_changed)
+
+    # ---------- presenting a frame ----------
+
+    def _sync_drag_mode(self) -> bool:
+        """Match drag mode to the sliders; True while a drag is being blitted.
+
+        A click is not a drag: the first update of a press is drawn the
+        ordinary way and drag mode starts with the next one. A plain click
+        then costs one full draw, not a drag-mode draw plus the release refit.
+        """
+        if self._blitter is None:
+            return False
+        slider = next((row.slider for row in self.rows.values()
+                       if row.slider.drag_active), None)
+        if slider is None:
+            self._drag_pending = None
+            if self._blitter.active:      # the release event never arrived
+                self._end_drag()
+            return False
+        if self._blitter.active:
+            if slider is self._dragged:
+                return True
+            # A stale drag after a lost release, and another slider pressed:
+            # blitting on would keep the new slider frozen in the background.
+            self._end_drag()
+        if self._drag_pending is not slider:
+            self._drag_pending = slider
+            return False
+        self._dragged = slider
+        self._blitter.begin(slider.ax)
+        return True
+
+    def _present(self, dragging: bool, static_changed: bool) -> None:
+        """Put the mutated artists on screen: a full draw, or a blitted drag frame.
+
+        static_changed says whether this update touched the static layer (the
+        cross-section title or the overlay legend); such a frame cannot blit.
+        """
+        if not dragging:
+            # visible_only: the hidden neck line keeps stale data by design.
+            for ax in self._data_axes:
                 ax.relim(visible_only=True)
                 ax.autoscale_view()
-        self.fig.canvas.draw_idle()
+            self.fig.canvas.draw_idle()
+            return
+        # Dragging: the view holds still, because rescaling changes the tick
+        # labels and with them the cached background.
+        for ax in self._data_axes:
+            ax.relim(visible_only=True)
+        if not all(self._view_holds(ax) for ax in self._data_axes):
+            for ax in self._data_axes:
+                ax.set_xmargin(DRAG_MARGIN)
+                ax.set_ymargin(DRAG_MARGIN)
+                ax.autoscale_view()
+            static_changed = True
+        if static_changed or not self._blitter.ready:
+            # Until that draw has run, later motion events land here again and
+            # re-request it (coalesced) instead of blitting a stale background.
+            self._blitter.invalidate()
+            self.fig.canvas.draw_idle()
+        else:
+            self._blitter.blit()
+
+    @staticmethod
+    def _view_holds(ax: Axes) -> bool:
+        """True when the data limits lie inside the view on every autoscaled axis."""
+        data, view = ax.dataLim, ax.viewLim
+        x0, x1 = sorted(view.intervalx)
+        y0, y1 = sorted(view.intervaly)
+        holds_x = not ax.get_autoscalex_on() or (x0 <= data.x0 and data.x1 <= x1)
+        holds_y = not ax.get_autoscaley_on() or (y0 <= data.y0 and data.y1 <= y1)
+        return holds_x and holds_y
+
+    def _end_drag(self) -> None:
+        """Leave drag mode and restore the tight view the non-drag path draws."""
+        self._blitter.end()
+        for ax in self._data_axes:
+            xmargin, ymargin = self._rest_margins[ax]
+            ax.set_xmargin(xmargin)
+            ax.set_ymargin(ymargin)
+            ax.relim(visible_only=True)
+            ax.autoscale_view()
+
+    def _on_release(self, _event) -> None:
+        self._drag_pending = None
+        if self._blitter is not None and self._blitter.active:
+            self._end_drag()
+            self.fig.canvas.draw_idle()
 
     def _apply_validity(self, ok: bool) -> None:
         # Color/alpha churn only on the valid<->invalid flip, not per frame.
