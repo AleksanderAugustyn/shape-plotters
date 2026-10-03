@@ -65,3 +65,18 @@ def animated(app: ShapePlotterApp) -> list:
     """Artists still flagged animated: must be empty outside a drag."""
     candidates = (*app._dynamic, *(row.slider.ax for row in app.rows.values()))
     return [artist for artist in candidates if artist.get_animated()]
+
+
+def data_inside_view(app: ShapePlotterApp) -> bool:
+    """True when every visible line on the data panels lies inside its axes limits."""
+    for ax in app._data_axes:
+        x0, x1 = sorted(ax.get_xlim())
+        y0, y1 = sorted(ax.get_ylim())
+        for line in ax.lines:
+            x = np.asarray(line.get_xdata(), dtype=float)
+            y = np.asarray(line.get_ydata(), dtype=float)
+            if not line.get_visible() or x.size == 0:
+                continue
+            if x.min() < x0 or x.max() > x1 or y.min() < y0 or y.max() > y1:
+                return False
+    return True

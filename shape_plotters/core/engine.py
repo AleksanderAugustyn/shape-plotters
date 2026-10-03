@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import numpy as np
 import matplotlib.pyplot as plt
+from matplotlib.axes import Axes
 from matplotlib.widgets import Button, CheckButtons
 
 from shape_plotters.core import energy, fragments, quadrature
@@ -41,6 +42,10 @@ UNITS_LABEL = "fm units"
 # WMMM scission bands: neck radius 1.2-1.5 fm (comparable because display
 # R0 = 1.16 fm equals WMMM's geometric R0; see FORD.md / v0.2 handoff).
 SCISSION_BAND_FM = (1.2, 1.5)
+
+# Headroom of a mid-drag refit, as an autoscale margin: when a dragged shape
+# outgrows the held view, the view jumps out this far so the next frames fit.
+DRAG_MARGIN = 0.25
 
 
 class ShapePlotterApp:
@@ -156,6 +161,7 @@ class ShapePlotterApp:
         if self.ax_extra is not None:
             dynamic += [self.extra_rho, self.extra_drho, self.zcm_extra]
         self._dynamic = tuple(dynamic)
+        self._rest_margins = {ax: ax.margins() for ax in self._data_axes}
 
     def _build_widgets(self) -> None:
         self.rows: dict[str, SliderRow] = {}
@@ -310,6 +316,7 @@ class ShapePlotterApp:
 
     def update(self, _val=None) -> None:
         dragging = self._sync_drag_mode()
+        static_before = (self.ax_shape.get_title(), self.shape_legend.get_visible())
         params = {k: row.slider.val for k, row in self.rows.items()}
         result = self.render.compute(params, self.toggle_state)
         self.last_result = result
@@ -411,7 +418,9 @@ class ShapePlotterApp:
         self._energy_lines = []   # any shape/Z/N/unit change invalidates energies
         self._refresh_stats()
 
-        self._present(dragging)
+        static_changed = static_before != (
+            self.ax_shape.get_title(), self.shape_legend.get_visible())
+        self._present(dragging, static_changed)
 
     # ---------- presenting a frame ----------
 
@@ -439,8 +448,12 @@ class ShapePlotterApp:
         self._blitter.begin(slider.ax)
         return True
 
-    def _present(self, dragging: bool) -> None:
-        """Put the mutated artists on screen: a full draw, or a blitted drag frame."""
+    def _present(self, dragging: bool, static_changed: bool) -> None:
+        """Put the mutated artists on screen: a full draw, or a blitted drag frame.
+
+        static_changed says whether this update touched the static layer (the
+        cross-section title or the overlay legend); such a frame cannot blit.
+        """
         if not dragging:
             # visible_only: the hidden neck line keeps stale data by design.
             for ax in self._data_axes:
@@ -450,15 +463,39 @@ class ShapePlotterApp:
             return
         # Dragging: the view holds still, because rescaling changes the tick
         # labels and with them the cached background.
-        if self._blitter.ready:
-            self._blitter.blit()
-        else:
+        for ax in self._data_axes:
+            ax.relim(visible_only=True)
+        if not all(self._view_holds(ax) for ax in self._data_axes):
+            for ax in self._data_axes:
+                ax.set_xmargin(DRAG_MARGIN)
+                ax.set_ymargin(DRAG_MARGIN)
+                ax.autoscale_view()
+            static_changed = True
+        if static_changed or not self._blitter.ready:
+            # Until that draw has run, later motion events land here again and
+            # re-request it (coalesced) instead of blitting a stale background.
+            self._blitter.invalidate()
             self.fig.canvas.draw_idle()
+        else:
+            self._blitter.blit()
+
+    @staticmethod
+    def _view_holds(ax: Axes) -> bool:
+        """True when the data limits lie inside the view on every autoscaled axis."""
+        data, view = ax.dataLim, ax.viewLim
+        x0, x1 = sorted(view.intervalx)
+        y0, y1 = sorted(view.intervaly)
+        holds_x = not ax.get_autoscalex_on() or (x0 <= data.x0 and data.x1 <= x1)
+        holds_y = not ax.get_autoscaley_on() or (y0 <= data.y0 and data.y1 <= y1)
+        return holds_x and holds_y
 
     def _end_drag(self) -> None:
         """Leave drag mode and restore the tight view the non-drag path draws."""
         self._blitter.end()
         for ax in self._data_axes:
+            xmargin, ymargin = self._rest_margins[ax]
+            ax.set_xmargin(xmargin)
+            ax.set_ymargin(ymargin)
             ax.relim(visible_only=True)
             ax.autoscale_view()
 

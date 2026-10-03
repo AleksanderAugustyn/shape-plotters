@@ -9,8 +9,8 @@ from matplotlib.backends.backend_agg import FigureCanvasAgg
 from shape_plotters.core.engine import ShapePlotterApp
 from shape_plotters.renders.beta import BetaRender
 from shape_plotters.renders.fos import FoSRender
-from tests.dragging import (animated, begin_drag, count_draws, move, pixels, press,
-                            release, steps)
+from tests.dragging import (animated, begin_drag, count_draws, data_inside_view, move,
+                            pixels, press, release, steps)
 
 # Drags that shrink the shape: the data never leaves the view and neither the
 # title nor the overlay legend changes, so every frame after the start can blit.
@@ -119,6 +119,64 @@ def test_updates_outside_a_drag_never_enter_drag_mode(make_app) -> None:
     assert not app._blitter.active and animated(app) == []
 
 
+# ---------- the held view ----------
+
+GROWING = [
+    pytest.param(BetaRender, "beta2", (0.0, 1.5, 0.01), id="beta"),
+    pytest.param(FoSRender, "c", (1.0, 2.5, 0.01), id="fos"),
+]
+
+
+@pytest.mark.parametrize("render_cls, key, span", GROWING)
+def test_growing_drag_refits_with_headroom(make_app, render_cls, key, span) -> None:
+    app = make_app(render_cls)
+    draws = count_draws(app)
+    values = steps(*span)
+    press(app, key, values[0])
+    for value in values[1:]:
+        move(app, key, value)
+        assert data_inside_view(app), f"shape clipped at {key}={value}"
+    # 150 steps of growth: a handful of refits, not one redraw per step.
+    assert 3 <= len(draws) <= 10
+    release(app, key)
+    reference = make_app(render_cls, **{key: span[1]})
+    assert ([ax.margins() for ax in app._data_axes]
+            == [ax.margins() for ax in reference._data_axes])
+    assert np.array_equal(pixels(app), pixels(reference))
+
+
+@pytest.mark.parametrize("presets, key, span", [
+    # The invalid-shape banner (the cross-section title) appears at beta4 = -1.2.
+    pytest.param({"beta4": -1.0}, "beta4", (-1.0, -1.3, -0.02), id="title"),
+    # The overlay legend hides at beta3 = 0 and comes back at 0.01.
+    pytest.param({"beta2": 0.5, "beta3": -0.05}, "beta3", (-0.05, 0.05, 0.01), id="legend"),
+])
+def test_static_change_mid_drag_reaches_the_frame(make_app, presets, key, span) -> None:
+    app = make_app(BetaRender, **presets)
+
+    def static_state() -> tuple[str, bool]:
+        return app.ax_shape.get_title(), app.shape_legend.get_visible()
+
+    seen = {static_state()}
+    for value in begin_drag(app, key, steps(*span)):
+        move(app, key, value)
+        seen.add(static_state())
+        frame = pixels(app)
+        app.fig.canvas.draw()
+        assert np.array_equal(frame, pixels(app)), f"stale static layer at {key}={value}"
+    assert len(seen) > 1      # the fixture really changed the title or the legend
+
+
+def test_drag_ending_on_an_invalid_shape_releases_cleanly(make_app) -> None:
+    app = make_app(BetaRender, beta4=-1.0)
+    for value in begin_drag(app, "beta4", steps(-1.0, -1.3, -0.02)):
+        move(app, "beta4", value)
+    assert not app.last_result.ok
+    release(app, "beta4")
+    reference = make_app(BetaRender, beta4=-1.3)
+    assert np.array_equal(pixels(app), pixels(reference))
+
+
 # ---------- robustness ----------
 
 def test_lost_release_ends_drag_mode_on_the_next_update(make_app) -> None:
@@ -183,3 +241,18 @@ def test_dragging_past_the_slider_end_stops_at_the_limit(make_app) -> None:
     assert not app._blitter.active and animated(app) == []
     reference = make_app(BetaRender, beta2=4.0)
     assert np.array_equal(pixels(app), pixels(reference))
+
+
+def test_save_after_a_drag_matches_an_ordinary_save(make_app) -> None:
+    app = make_app(BetaRender, beta2=1.0)
+    for value in begin_drag(app, "beta2", steps(1.0, 0.9, -0.01)):
+        move(app, "beta2", value)
+    release(app, "beta2")
+    reference = make_app(BetaRender, beta2=0.9)
+
+    def saved(target: ShapePlotterApp) -> bytes:
+        buffer = io.BytesIO()
+        target.fig.savefig(buffer, format="rgba", dpi=100)
+        return buffer.getvalue()
+
+    assert saved(app) == saved(reference)
