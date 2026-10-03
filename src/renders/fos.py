@@ -1,4 +1,4 @@
-"""FoS render over the fos_parameterization package (2.0.0).
+"""FoS render over the fos_parameterization package.
 
 rho(z)-native (lib-exact drho_dz, lib-native neck); R(theta) and analytic
 dR/dtheta come from the library's cached tier on the shared GL-2048 set
@@ -6,6 +6,9 @@ dR/dtheta come from the library's cached tier on the shared GL-2048 set
 evaluates R(theta) in the total-shift frame internally, so no z_shift
 plumbing. Neck position/radius are lib values on the cache's u-grid; only
 the displayed depth reuses the shared peak analysis on the display profile.
+The cache is read-only and every call resolves from params, so it may be
+shared across threads. A separated shape draws its fragments from the
+unchecked profile; the checked statuses still decide validity.
 
 Fast-math precondition: params must be finite. Sliders only emit finite
 values, so no screening happens here.
@@ -41,8 +44,7 @@ class FoSRender:
     toggles: list[ToggleSpec] = []
 
     def __init__(self) -> None:
-        # One cache: 7 params, WMMM-parity u-grid, GL-2048 thetas.
-        # Thread-confined: fine — the engine computes on the UI thread only.
+        # One read-only cache: max_params 7, WMMM-parity u-grid, GL-2048 thetas.
         self._cache = fp.Cache(len(PARAM_KEYS), N_RHO_GRID, nodes.THETA)
 
     def compute(self, params: dict[str, float], toggles: dict[str, bool]) -> ShapeResult:
@@ -51,6 +53,11 @@ class FoSRender:
         rd = self._cache.radius_and_derivative(arr) if shp.ok else None
         prof = fp.rho_z_grid(arr, N_PROFILE_POINTS)
         ok = shp.ok and rd is not None and rd.ok and prof.ok
+        # A separated shape fails the checked profile with rho_negative; draw
+        # its fragments from the unchecked profile (rho = 0 in the void). The
+        # checked results keep deciding ok, status and title.
+        drawn = (fp.rho_z_grid_unchecked(arr, N_PROFILE_POINTS)
+                 if prof.status == fp.Status.rho_negative else prof)
 
         if ok:
             radii, dr_dtheta = rd.radii, rd.dr_dtheta
@@ -67,10 +74,10 @@ class FoSRender:
         nk = self._cache.neck(arr)
         if nk.ok and nk.found and nk.rho_neck > 0.0:
             depth = 0.0
-            if prof.ok:
-                hit = find_neck_indices(prof.rho)
+            if drawn.ok:
+                hit = find_neck_indices(drawn.rho)
                 if hit is not None:
-                    depth = neck_depth(prof.rho, *hit)
+                    depth = neck_depth(drawn.rho, *hit)
             neck_info = NeckInfo(z=nk.z_neck, rho=nk.rho_neck,
                                  depth=depth, source="lib")
         # The FoS shape is COM-centered by definition (rho_z_grid is the COM
@@ -80,7 +87,7 @@ class FoSRender:
             status=int(primary.status), status_name=primary.status.name,
             message=primary.message,
             theta=nodes.THETA, radius=radii,
-            z=prof.z, rho=prof.rho, drho_dz=prof.drho_dz,
+            z=drawn.z, rho=drawn.rho, drho_dz=drawn.drho_dz,
             neck=neck_info,
             scalars={"z_shift": shp.z_shift, "a2": fp.a2(arr)},
             length_keys=frozenset({"z_shift"}),

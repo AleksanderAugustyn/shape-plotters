@@ -1,10 +1,12 @@
-"""Beta (Legendre) render over the beta_parameterization package (3.0.0).
+"""Beta (Legendre) render over the beta_parameterization package.
 
 GL-native: R(theta) and analytic dR/dtheta come from the library's cached
 tier evaluated on the shared GL-2048 primary theta set (src/core/nodes.py) —
-in sync with the energy model's dense grid. Volume conservation and the COM
-correction live in the library: radii, dR/dtheta and the polar radii arrive
-pre-scaled, and resolve_shape reports the applied volume_factor. The neck is
+in sync with the energy model's dense grid. One read-only cache serves every
+call; each call resolves from its betas, so the cache may be shared across
+threads. Volume conservation and the COM correction are per-call library
+options: radii, dR/dtheta and the polar radii arrive pre-scaled, and
+resolve_shape reports the applied volume_factor. The neck is
 the Python display-only heuristic (src/core/neck.py) — graduating it into the
 library is recorded future work.
 
@@ -28,8 +30,8 @@ from src.core.neck import find_neck_indices, neck_depth
 from src.core.result import EnergyRequest, NeckInfo, ShapeResult, SliderSpec
 
 N_BETAS = 8
-# WMMM's legendre parameterization takes 20 betas; sliders drive the first 8.
-WMMM_N_LEGENDRE_PARAMS = 20
+# WMMM's legendre parameterization takes 8 betas, all slider-driven.
+WMMM_N_LEGENDRE_PARAMS = 8
 # The COM-corrected shape coincides with the slider shape when the corrected
 # dipole equals the slider beta1 (beta10 is a shape parameter, not a
 # translation knob); below this |corrected_beta10 - beta1| the orange overlay
@@ -52,25 +54,22 @@ class BetaRender:
     toggles = []
 
     def __init__(self) -> None:
-        # apply_com and conserve_volume are creation flags in 3.0.0, so the
-        # blue (raw) and orange (COM-corrected) shapes get one cache each.
-        # Thread-confined: fine — the engine computes on the UI thread only.
-        self._cache_raw = bp.Cache(N_BETAS, nodes.THETA,
-                                   conserve_volume=True, apply_com=False)
-        self._cache_com = bp.Cache(N_BETAS, nodes.THETA,
-                                   conserve_volume=True, apply_com=True)
+        # The blue (raw) and orange (COM-corrected) shapes share the cache;
+        # they differ only in the per-call apply_com option.
+        self._cache = bp.Cache(N_BETAS, nodes.THETA)
 
     def compute(self, params: dict[str, float], toggles: dict[str, bool]) -> ShapeResult:
         betas = [params[f"beta{i}"] for i in range(1, N_BETAS + 1)]
         # Default (blue) shape: the slider betas as-is, including the slider beta10.
-        resolved = self._cache_raw.resolve_shape(betas)
-        rd = self._cache_raw.radius_and_derivative(betas) if resolved.ok else None
+        resolved = self._cache.resolve_shape(betas, conserve_volume=True)
+        rd = (self._cache.radius_and_derivative(betas, conserve_volume=True)
+              if resolved.ok else None)
         ok = rd is not None and rd.ok
 
         vol_factor = 1.0
         if ok:
             # Radii, derivative and poles arrive pre-scaled by the library's
-            # volume factor (conserve_volume cache); no Python rescaling.
+            # volume factor (conserve_volume=True); no Python rescaling.
             radii = rd.radii
             dr_dtheta = rd.dr_dtheta
             r_north = resolved.r_north
@@ -89,7 +88,7 @@ class BetaRender:
             # the broken (self-crossing) outline still draws — the engine
             # greys it — instead of the shape collapsing to a point. Unscaled
             # by design: invalid shapes get no volume conservation.
-            grid = self._cache_raw.radius_grid_unchecked(betas)
+            grid = self._cache.radius_grid_unchecked(betas)
             z = grid.radii * nodes.X
             rho = grid.radii * nodes.SIN_THETA
 
@@ -109,11 +108,12 @@ class BetaRender:
         overlay_z = overlay_rho = None
         overlay_z_cm = 0.0
         overlay_ok = True
-        corrected = self._cache_com.resolve_shape(betas)
+        corrected = self._cache.resolve_shape(betas, conserve_volume=True, apply_com=True)
         if corrected.ok:
             scalars["corrected_beta10"] = corrected.corrected_beta10
             if ok and abs(corrected.corrected_beta10 - betas[0]) > OVERLAY_BETA10_THRESHOLD:
-                rd_c = self._cache_com.radius_and_derivative(betas)
+                rd_c = self._cache.radius_and_derivative(
+                    betas, conserve_volume=True, apply_com=True)
                 if rd_c.ok:
                     radii_c = rd_c.radii
                     z_c = radii_c * nodes.X
@@ -127,11 +127,13 @@ class BetaRender:
                     overlay_z_cm = quadrature.z_cm(nodes.THETA, radii_c)
         elif ok and corrected.status == bp.Status.interior_negative:
             # The COM-centering beta10 exists (poles fine, COM converged) but
-            # the corrected shape is interior-negative — 3.0.0 catches this at
-            # resolve_shape, because the volume factor is computed after
-            # validation. Draw the near-miss greyed via the unchecked path so
-            # it stays visible instead of the overlay silently vanishing.
-            grid_c = self._cache_com.radius_grid_unchecked(betas)
+            # the corrected shape is interior-negative — the library catches
+            # this at resolve_shape, because the volume factor is computed
+            # after validation. Draw the near-miss greyed via the unchecked
+            # path so it stays visible instead of the overlay silently
+            # vanishing. apply_com is explicit: without it this is the
+            # uncorrected shape.
+            grid_c = self._cache.radius_grid_unchecked(betas, apply_com=True)
             overlay_z = grid_c.radii * nodes.X
             overlay_rho = grid_c.radii * nodes.SIN_THETA
             overlay_ok = False

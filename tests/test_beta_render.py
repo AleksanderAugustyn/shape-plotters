@@ -1,4 +1,4 @@
-"""BetaRender: contract wiring over the beta_parameterization 3.0.0 cached tier."""
+"""BetaRender: contract wiring over the beta_parameterization read-only cache."""
 import numpy as np
 import pytest
 import beta_parameterization as bp
@@ -8,6 +8,9 @@ from src.renders.beta import BetaRender
 
 # Probed lib-VALID and necked (carried over from v0.1).
 NECKED_BETAS = [0.0, 1.5, 0.0, 0.8]
+# Raw shape valid, COM-corrected shape interior-negative (probed 2026-10-03
+# under 3.0.0 and 4.0.1: raw min R +0.22, corrected min R -0.083).
+NEAR_MISS_BETAS = [0.0, 0.5, -1.2, 1.3]
 
 
 @pytest.fixture(scope="module")
@@ -21,11 +24,11 @@ def _params(betas: list[float]) -> dict[str, float]:
 
 
 def test_status_contract() -> None:
-    # 3.0.0 renumbering: shared contract codes 0-6, library codes >= 100,
-    # members lowercase. Guards the raw ints ShapeResult.status carries.
+    # Shared contract codes 0-5 (6 retired, never reused), library codes
+    # >= 100, members lowercase. Guards the raw ints ShapeResult.status carries.
     assert bp.Status.valid == 0
+    assert bp.Status.wrong_param_count == 4
     assert bp.Status.interior_negative == 102
-    assert bp.CACHE_MAX_PARAMS == 8
 
 
 def test_sphere(render: BetaRender) -> None:
@@ -43,7 +46,7 @@ def test_sphere(render: BetaRender) -> None:
 
 
 def test_volume_factor_from_library(render: BetaRender) -> None:
-    # 3.0.0: the factor comes from the library (GL-512 over the raw shape),
+    # The factor comes from the library (GL-512 over the raw shape),
     # replacing the Python GL-2048 replica. Old ShapePlotter PNG golden
     # 0.99598851 (trapezoid) still agrees to display tolerance, and the
     # returned radii integrate to the unit-sphere volume exactly.
@@ -121,8 +124,8 @@ def test_necked_shape(render: BetaRender) -> None:
 def test_invalid_shape_returns_status_not_exception(render: BetaRender) -> None:
     res = render.compute(_params([0.0, 4.0]), {"com": False})  # interior negative
     assert not res.ok
-    assert res.status == int(bp.Status.interior_negative)      # 102 in 3.0.0
-    assert res.status_name == "interior_negative"              # lowercase in 3.0.0
+    assert res.status == int(bp.Status.interior_negative)      # 102
+    assert res.status_name == "interior_negative"              # lowercase member name
     assert res.message
     assert res.neck is None
     assert res.radius.shape == (nodes.N_NODES,) and not res.radius.any()
@@ -153,6 +156,35 @@ def test_no_overlay_when_slider_matches_corrected(render: BetaRender) -> None:
     assert res.overlay_z is None
 
 
+def test_com_near_miss_overlay(render: BetaRender) -> None:
+    # The corrected shape fails at resolve_shape, so the overlay is the greyed
+    # unchecked grid of the COM-CORRECTED shape: apply_com must reach that call.
+    res = render.compute(_params(NEAR_MISS_BETAS), {})
+    assert res.ok
+    assert res.overlay_ok is False
+    assert res.overlay_z is not None and res.overlay_rho is not None
+    padded = NEAR_MISS_BETAS + [0.0] * 4
+    with bp.Cache(8, nodes.THETA) as ref:
+        corrected = ref.radius_grid_unchecked(padded, apply_com=True).radii
+        uncorrected = ref.radius_grid_unchecked(padded).radii
+    assert np.array_equal(res.overlay_rho, corrected * nodes.SIN_THETA)
+    assert np.array_equal(res.overlay_z, corrected * nodes.X)
+    assert not np.allclose(res.overlay_rho, uncorrected * nodes.SIN_THETA)
+    assert (res.overlay_rho < 0.0).any()           # the interior-negative region
+
+
+def test_compute_repeatable_on_shared_cache(render: BetaRender) -> None:
+    # Raw and COM calls share one cache; nothing may carry between calls.
+    p = _params([0.0, 0.85, 0.35, 0.18])
+    first = render.compute(p, {})
+    render.compute(_params(NEAR_MISS_BETAS), {})
+    render.compute(_params([0.0, 4.0]), {})
+    again = render.compute(p, {})
+    for field in ("radius", "dr_dtheta", "overlay_z", "overlay_rho"):
+        assert np.array_equal(getattr(first, field), getattr(again, field)), field
+    assert first.scalars == again.scalars
+
+
 def test_slider_specs_and_filename(render: BetaRender) -> None:
     assert [s.key for s in render.slider_specs] == [f"beta{i}" for i in range(1, 9)]
     assert (render.slider_specs[0].vmin, render.slider_specs[0].vmax) == (-1.6, 1.6)
@@ -168,9 +200,8 @@ def test_energy_requests_single_without_overlay(render: BetaRender) -> None:
     assert res.overlay_z is None
     (req,) = render.energy_requests(p, res)
     assert (req.label, req.param_type, req.com_correction) == ("slider", "legendre", False)
-    assert len(req.shape) == 20                      # WMMM's legendre width
-    assert req.shape[:8] == (0.0, 0.30, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
-    assert req.shape[8:] == (0.0,) * 12              # zero-padded tail
+    assert len(req.shape) == 8                       # WMMM's legendre width
+    assert req.shape == (0.0, 0.30, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
 
 
 def test_energy_requests_both_with_overlay(render: BetaRender) -> None:

@@ -2,7 +2,7 @@
 import numpy as np
 import pytest
 
-from src.core.engine import R0_FM, ShapePlotterApp
+from src.core.engine import INVALID_COLOR, R0_FM, ShapePlotterApp
 from src.renders.beta import BetaRender
 from src.renders.fos import FoSRender
 
@@ -158,6 +158,22 @@ def test_zcm_marker_on_fos_profile_panel() -> None:
     plt.close(a.fig)
 
 
+def test_fos_separated_shape_draws_greyed_fragments() -> None:
+    # Separated shape reachable from the sliders (a4 and a6 at their limits):
+    # the profile panel draws both fragments greyed, titled with the checked
+    # verdict, instead of a flat zero line.
+    a = ShapePlotterApp(FoSRender())
+    for key, val in {"c": 2.5, "a4": 0.75, "a6": 0.5}.items():
+        a.rows[key].slider.set_val(val)
+    assert not a.last_result.ok
+    assert "beak_singularity" in a.ax_shape.get_title()
+    _, rho = a.extra_rho.get_data()
+    assert np.max(rho) > 0.0
+    assert a.extra_rho.get_color() == INVALID_COLOR
+    import matplotlib.pyplot as plt
+    plt.close(a.fig)
+
+
 def test_zcm_marker_hidden_on_invalid() -> None:
     a = ShapePlotterApp(BetaRender())
     a.rows["beta2"].slider.set_val(4.0)                  # invalid shape
@@ -266,7 +282,7 @@ def test_energy_click_appends_block_and_any_change_clears(monkeypatch) -> None:
     a._on_energy()
     text = a.stats_text.get_text()
     assert "WMMM [MeV]:" in text and "E_total = 2.0000" in text
-    assert calls == [("legendre", 92, 144, (0.0,) * 20, False)]  # sphere: 1 request
+    assert calls == [("legendre", 92, 144, (0.0,) * 8, False)]  # sphere: 1 request
     a.rows["beta2"].slider.set_val(0.3)          # slider change clears
     assert "WMMM" not in a.stats_text.get_text()
     a._on_energy()
