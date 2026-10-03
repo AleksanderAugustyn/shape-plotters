@@ -5,6 +5,9 @@ Two tiers:
 - Artist mutation (draw neutered): the clear-and-replot regression guard.
   v0.1 rebuilt every artist per frame: ~15/20 ms (beta/fos). v0.2 persistent
   artists: ~1 ms. Budget 5 ms.
+  Two-tier wheels (beta 4.0.1, fos 3.0.0; 2026-10-03): 1.4 / 2.2 ms —
+  every call resolves from params; the repeated vector is no longer served
+  from stored state.
 - One-draw frame (update() alone; under Agg its draw_idle draws immediately):
   loose interactivity backstop. Full-figure rasterization (~35 axes) costs
   ~73-95 ms and dominates any engine improvement short of blitting; measured
