@@ -2,6 +2,20 @@
 
 Notable changes to shape-plotters. Versions follow semantic versioning.
 
+## 0.2.1
+
+### Fixed
+
+- **Segfault on mouse motion under GTK 4** on Ubuntu 22.04 and other systems
+  with PyGObject < 3.47 ([#1]). matplotlib 3.10.0's GTK 4 backend crashes
+  there, and matplotlib picks GTK 4 over Tk when it can import it. matplotlib
+  3.10.0 is now excluded, so installing shape-plotters upgrades it.
+- **README backend note.** Tk is not always the default; matplotlib prefers
+  Qt or GTK when available. The README now says so and shows how to force a
+  backend with `MPLBACKEND`.
+
+[#1]: https://github.com/AleksanderAugustyn/shape-plotters/issues/1
+
 ## 0.2.0
 
 Interactive performance. Measured in a real window on the development PC

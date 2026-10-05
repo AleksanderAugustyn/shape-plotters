@@ -13,7 +13,9 @@ dependencies = [
     "numpy>=2.0",
     # First releases that install alongside numpy 2.
     "scipy>=1.13",
-    "matplotlib>=3.8.4",
+    # 3.10.0's GTK 4 backend segfaults on mouse motion with PyGObject < 3.47
+    # (Ubuntu 22.04); fixed in 3.10.1 (matplotlib PR 29363).
+    "matplotlib>=3.8.4,!=3.10.0",
     # Exact pins: each render is written against one library API version.
     "beta-parameterization==4.0.1",
     "fos-parameterization==3.0.0",
