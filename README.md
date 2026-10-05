@@ -41,8 +41,9 @@ released. If the shape outgrows the view mid-drag, the view jumps out once.
 
 - Linux x86-64. The parameterization libraries ship manylinux wheels only;
   WSL2 with WSLg works.
-- Python 3.10 or newer with a matplotlib GUI backend. Tk is the default
-  (`python3-tk` on Debian/Ubuntu).
+- Python 3.10 or newer with a matplotlib GUI backend. Tk (`python3-tk` on
+  Debian/Ubuntu) always works; matplotlib prefers Qt or GTK when it can
+  import them. Force one with e.g. `MPLBACKEND=TkAgg shape-plotters fos`.
 
 ## Install
 
