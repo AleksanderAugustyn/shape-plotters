@@ -17,6 +17,9 @@ Notable changes to shape-plotters. Versions follow semantic versioning.
   `tqs_parameterization` is importable: the library is not on PyPI yet.
 - **`ShapeResult.notes`**: free-text lines a render adds to the stats block,
   printed after the scalars.
+- **`ShapeResult.infer_rtheta_overlay`** (default True): a render whose R(θ)
+  is already about the true centre of mass sets it False, so GL quadrature
+  error on a steep R(θ) is never drawn as a star-convex frame shift.
 
 ### Changed
 

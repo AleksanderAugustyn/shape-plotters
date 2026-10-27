@@ -87,6 +87,9 @@ class ShapeResult:
     overlay_z_cm: float = 0.0
     overlay_ok: bool = True           # False => corrected shape is invalid; grey the overlay
     notes: tuple[str, ...] = ()       # free-text stats lines, after the scalars
+    # False when R(θ) is already about the true COM (tqs): a GL z_cm mismatch is
+    # then quadrature error, not a star-convex frame shift to overlay.
+    infer_rtheta_overlay: bool = True
 
     @property
     def ok(self) -> bool:

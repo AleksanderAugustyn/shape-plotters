@@ -349,3 +349,19 @@ def test_stats_block_prints_notes() -> None:
     assert "middle: one_sheet (waist inside)" in block.splitlines()
     assert a._stats_block(res, 1.0, "R0", 0.0, 0.0, 0.0).count("\n") == block.count("\n") - 1
     plt.close(a.fig)
+
+
+def test_no_rtheta_overlay_for_tqs_steep_shape() -> None:
+    # tqs R(θ) is about the exact COM; near scission GL-2048 misses its z_cm by
+    # ~1e-5, which must not be read as a FoS-style star-convex frame shift.
+    pytest.importorskip("tqs_parameterization")
+    from shape_plotters.renders.tqs import PARAM_KEYS, TqsRender
+    import matplotlib.pyplot as plt
+    a = ShapePlotterApp(TqsRender())
+    for key, val in zip(PARAM_KEYS, (2.24, -0.77, 1.17, -0.78, 0.45)):
+        a.rows[key].slider.set_val(val)
+    assert a.last_result.ok
+    assert not a.rtheta_upper.get_visible()
+    assert not a.rtheta_zcm.get_visible()
+    assert not a.shape_legend.get_visible()
+    plt.close(a.fig)

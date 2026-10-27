@@ -113,7 +113,8 @@ class TqsRender:
             r_north=geo.r_north if geo.ok else 0.0,
             r_south=geo.r_south if geo.ok else 0.0,
             z_cm=0.0,
-            notes=notes)
+            notes=notes,
+            infer_rtheta_overlay=False)
 
     @staticmethod
     def _middle_note(geo: tp.Geometry) -> str:
