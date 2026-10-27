@@ -9,7 +9,7 @@ A render must expose:
     toggles: list[ToggleSpec]
     has_extra_panel: bool                # True -> engine draws rho(z) + drho_dz panel
     compute(params: dict[str, float], toggles: dict[str, bool]) -> ShapeResult
-    filename(z: int, n: int, params: dict[str, float]) -> str
+    filename(a_mass: int, params: dict[str, float]) -> str
     energy_requests(params: dict[str, float], result: ShapeResult)
         -> list[EnergyRequest]           # WMMM computations for this shape(s)
 """

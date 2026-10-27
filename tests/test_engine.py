@@ -24,7 +24,7 @@ def test_smoke_draw_and_save(app, tmp_path) -> None:
 
 
 def test_unit_toggle_scales_and_relabels(app) -> None:
-    a = app.z_box.value + app.n_box.value
+    a = app.mass_number
     assert app._scale() == pytest.approx(R0_FM * a ** (1.0 / 3.0))
     assert "[fm]" in app.ax_shape.get_xlabel()
     app._on_check("fm units")           # -> R0 units
@@ -65,7 +65,7 @@ def test_fragments_shown_for_necked_shape() -> None:
     assert vol is not None and mass is not None
     assert float(vol.group(1)) >= float(vol.group(2))    # heavy : light
     assert int(mass.group(1)) >= int(mass.group(2))
-    assert int(mass.group(3)) == a.z_box.value + a.n_box.value   # A = Z + N = 236
+    assert int(mass.group(3)) == a.mass_number              # slider default 236
     import matplotlib.pyplot as plt
     plt.close(a.fig)
 
@@ -97,7 +97,7 @@ def test_scission_has_no_checkbox(app) -> None:
 def test_scission_bands_rescale_on_unit_toggle(app) -> None:
     assert _band_top(app.scission_bands[0]) == pytest.approx(1.5)  # fm mode
     app._on_check("fm units")                                      # -> R0 units
-    a = app.z_box.value + app.n_box.value
+    a = app.mass_number
     expected = 1.5 / (R0_FM * a ** (1.0 / 3.0))
     assert _band_top(app.scission_bands[0]) == pytest.approx(expected)
 
@@ -106,7 +106,7 @@ def test_save_uses_render_filename(app, tmp_path, monkeypatch) -> None:
     monkeypatch.chdir(tmp_path)
     app._save()
     expected = app.render.filename(
-        app.z_box.value, app.n_box.value,
+        app.mass_number,
         {k: r.slider.val for k, r in app.rows.items()})
     assert (tmp_path / expected).exists()
 

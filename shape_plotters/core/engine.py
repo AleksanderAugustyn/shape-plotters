@@ -31,6 +31,10 @@ from shape_plotters.core.widgets import IntTextBox, SliderRow
 
 # Display convention (both old plotters used 1.16); distinct from WMMM physics constants.
 R0_FM = 1.16
+# The A slider: the spherical volume depends on A alone, so A is the mass
+# input every render has. Z and N exist only for the WMMM energy overlay.
+MASS_NUMBER_RANGE = (16, 300)
+MASS_NUMBER_INIT = 236
 
 VALID_COLOR = "tab:blue"
 DERIV_COLOR = "tab:red"
@@ -173,8 +177,11 @@ class ShapePlotterApp:
             row.slider.on_changed(self.update)
             self.rows[spec.key] = row
             y += 0.031
-        self.z_box = IntTextBox(self.fig, (0.88, 0.40, 0.06, 0.030), "Z ", 92, self._on_zn)
-        self.n_box = IntTextBox(self.fig, (0.88, 0.36, 0.06, 0.030), "N ", 144, self._on_zn)
+        # The spherical volume depends on A alone, so A is the one mass input
+        # every render has. Not a parameter row: it never reaches compute().
+        self.a_row = SliderRow(self.fig, y, "A", *MASS_NUMBER_RANGE,
+                               MASS_NUMBER_INIT, 1)
+        self.a_row.slider.on_changed(self._on_mass)
         self.btn_reset = Button(self.fig.add_axes((0.86, 0.31, 0.10, 0.030)), "Reset")
         self.btn_reset.on_clicked(self._reset)
         self.btn_save = Button(self.fig.add_axes((0.86, 0.27, 0.10, 0.030)), "Save")
@@ -186,14 +193,25 @@ class ShapePlotterApp:
             self.fig.add_axes((0.86, 0.26 - 0.04 * n, 0.11, 0.04 * n)), labels, actives)
         self.checks.on_clicked(self._on_check)
         self.btn_energy = None
+        self.z_box: IntTextBox | None = None
+        self.n_box: IntTextBox | None = None
         if energy.available():
             # Right column, below the toggle block; absent (layout untouched)
-            # when the local WMMM install is missing.
+            # when the local WMMM install is missing. Z and N exist only for
+            # the energy call, so they live beside the button that uses them.
+            y_energy = 0.26 - 0.04 * n - 0.045
             self.btn_energy = Button(
-                self.fig.add_axes((0.86, 0.26 - 0.04 * n - 0.045, 0.10, 0.030)),
-                "Energy")
+                self.fig.add_axes((0.86, y_energy, 0.10, 0.030)), "Energy")
             self.btn_energy.on_clicked(self._on_energy)
+            self.z_box = IntTextBox(self.fig, (0.88, y_energy - 0.04, 0.06, 0.030),
+                                    "Z ", 92, self._on_zn)
+            self.n_box = IntTextBox(self.fig, (0.88, y_energy - 0.08, 0.06, 0.030),
+                                    "N ", 144, self._on_zn)
         self._suppress_widget_draws()
+
+    @property
+    def mass_number(self) -> int:
+        return int(round(self.a_row.slider.val))
 
     def _suppress_widget_draws(self) -> None:
         # update() issues the single authoritative draw_idle(); without this,
@@ -202,7 +220,7 @@ class ShapePlotterApp:
         widgets: list = [self.btn_reset, self.btn_save, self.checks]
         if self.btn_energy is not None:
             widgets.append(self.btn_energy)
-        for row in self.rows.values():
+        for row in [*self.rows.values(), self.a_row]:
             widgets += [row.slider, row.btn_dec, row.btn_inc]
         for w in widgets:
             if hasattr(w, "drawon"):  # guard against future mpl API changes
@@ -231,15 +249,27 @@ class ShapePlotterApp:
             self.extra_legend.get_texts()[0].set_text(f"ρ(z) [{unit}]")
         self._reposition_scission()
 
-    def _on_zn(self) -> None:
-        # Z/N changes the fm<->R0 scale, so fm-fixed band edges move in R0 mode.
+    def _on_mass(self, _val=None) -> None:
+        # A changes the fm<->R0 scale, so fm-fixed band edges move in R0 mode.
+        # Not a blitted drag: the A slider is outside the parameter rows, so
+        # every step is a full draw, acceptable for a value that rarely moves.
         self._reposition_scission()
         self.update()
+
+    def _on_zn(self) -> None:
+        # Z and N feed only the energy call; the shape and its scale are
+        # untouched, so only the energy block goes stale.
+        self._energy_lines = []
+        self._refresh_stats()
+        self.fig.canvas.draw_idle()
+
+    def _r0_fm(self) -> float:
+        return R0_FM * float(self.mass_number) ** (1.0 / 3.0)
 
     def _fm_to_display(self, v_fm: float) -> float:
         if self.fm_units:
             return v_fm
-        return v_fm / (R0_FM * float(self.z_box.value + self.n_box.value) ** (1.0 / 3.0))
+        return v_fm / self._r0_fm()
 
     def _reposition_scission(self) -> None:
         lo, hi = (self._fm_to_display(v) for v in SCISSION_BAND_FM)
@@ -265,7 +295,7 @@ class ShapePlotterApp:
         # the file: leave drag mode first.
         self._on_release(None)
         params = {k: row.slider.val for k, row in self.rows.items()}
-        fname = self.render.filename(self.z_box.value, self.n_box.value, params)
+        fname = self.render.filename(self.mass_number, params)
         self.fig.savefig(fname, dpi=300, bbox_inches="tight")
         print(f"Saved {fname}")
 
@@ -274,18 +304,26 @@ class ShapePlotterApp:
 
     def _on_energy(self, _event=None) -> None:
         result = self.last_result
+        if self.z_box is None or self.n_box is None:
+            return                      # no energy overlay without WMMM
         if result is None or not result.ok:
             self._energy_lines = ["", "WMMM: shape invalid (not computed)"]
         else:
             params = {k: row.slider.val for k, row in self.rows.items()}
             requests = self.render.energy_requests(params, result)
+            z, n = self.z_box.value, self.n_box.value
             lines: list[str] = []
             for req in requests:
                 res = energy.compute(
-                    req.param_type, self.z_box.value, self.n_box.value,
+                    req.param_type, z, n,
                     req.shape, com_correction=req.com_correction)
                 lines += self._energy_block(
                     req.label if len(requests) > 1 else None, res)
+            if z + n != self.mass_number:
+                # The shape's scale and mass split follow the A slider; the
+                # energy follows the boxes. Say so instead of silently
+                # mixing two nuclei.
+                lines += ["", f"WMMM: Z+N = {z + n} ≠ A = {self.mass_number}"]
             self._energy_lines = lines
         self._refresh_stats()
         self.fig.canvas.draw_idle()
@@ -313,7 +351,7 @@ class ShapePlotterApp:
     def _scale(self) -> float:
         if not self.fm_units:
             return 1.0
-        return R0_FM * float(self.z_box.value + self.n_box.value) ** (1.0 / 3.0)
+        return self._r0_fm()
 
     def update(self, _val=None) -> None:
         dragging = self._sync_drag_mode()
@@ -402,7 +440,7 @@ class ShapePlotterApp:
         self.shape_legend.set_visible(show_rtheta)
 
         # Fragment split at the neck (R0 units; the fm scale cancels in a ratio,
-        # so only the mass split f*(Z+N) needs the display Z/N).
+        # so only the mass split f*A needs the slider A).
         frag = None
         if result.neck is not None:
             v_lo, v_hi = fragments.fragment_volumes(
@@ -410,13 +448,13 @@ class ShapePlotterApp:
                 -result.r_south, result.r_north)
             total = v_lo + v_hi
             if total > 0.0 and v_lo > 0.0 and v_hi > 0.0:
-                a_mass = self.z_box.value + self.n_box.value
+                a_mass = self.mass_number
                 fracs = sorted((v_lo / total, v_hi / total), reverse=True)
                 frag = (fracs[0], fracs[1],
                         fracs[0] * a_mass, fracs[1] * a_mass, a_mass)
 
         self._stats_base = self._stats_block(result, scale, unit, v, s, zc, frag)
-        self._energy_lines = []   # any shape/Z/N/unit change invalidates energies
+        self._energy_lines = []   # any shape/A/unit change invalidates energies
         self._refresh_stats()
 
         static_changed = static_before != (
