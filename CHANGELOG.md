@@ -4,6 +4,20 @@ Notable changes to shape-plotters. Versions follow semantic versioning.
 
 ## Unreleased
 
+### Added
+
+- **`tqs` render** over tqs-parameterization (Nix's three quadratic
+  surfaces). Five sliders, σ1, σ2, σ3, α2 and α3, with the sphere point
+  marked, starting from a necked shape. The ρ(z) panel, the neck, the poles
+  and the shape flags all come from the library; a separated or pinched
+  shape draws both fragments and the split plane. The stats block shows the
+  joins z1 and z2, u, α1, Möller's σ1t and (for σ2 < 0) the scission locus
+  σ1*, Möller's d, q2, αg, εf1 and εf2, the 240Pu quadrupole moment in barns,
+  and the middle-body kind. The render is registered only when
+  `tqs_parameterization` is importable: the library is not on PyPI yet.
+- **`ShapeResult.notes`**: free-text lines a render adds to the stats block,
+  printed after the scalars.
+
 ### Changed
 
 - **A slider replaces the Z and N boxes.** The spherical volume depends on
