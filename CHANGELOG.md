@@ -2,6 +2,20 @@
 
 Notable changes to shape-plotters. Versions follow semantic versioning.
 
+## Unreleased
+
+### Changed
+
+- **A slider replaces the Z and N boxes.** The spherical volume depends on
+  A alone, so the mass number is now a slider (16 to 300, step 1) at the top
+  of the slider stack. It drives the fm / R₀ scale, the scission-band
+  positions, the fragment mass split and the saved filename, which now
+  carries `A236` instead of `92_144` / `Z92_N144`. A Z box exists only when
+  the optional WMMM energy overlay is installed, beside the Energy button;
+  the energy is computed for (Z, N = A − Z) and the block names that
+  nucleus. Render `filename(a_mass, params)` replaces
+  `filename(z, n, params)`.
+
 ## 0.2.1
 
 ### Fixed

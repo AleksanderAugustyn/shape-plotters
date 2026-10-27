@@ -93,8 +93,8 @@ class FoSRender:
             length_keys=frozenset({"z_shift"}),
             dr_dtheta=dr_dtheta, r_north=shp.r_north, r_south=shp.r_south, z_cm=0.0)
 
-    def filename(self, z: int, n: int, params: dict[str, float]) -> str:
-        return (f"fos_shape_Z{z}_N{n}_c{params['c']:.2f}"
+    def filename(self, a_mass: int, params: dict[str, float]) -> str:
+        return (f"fos_shape_A{a_mass}_c{params['c']:.2f}"
                 + "".join(f"_a{i}{params[f'a{i}']:.2f}" for i in range(3, 9))
                 + ".png")
 

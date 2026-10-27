@@ -148,9 +148,9 @@ class BetaRender:
             overlay_z=overlay_z, overlay_rho=overlay_rho, overlay_z_cm=overlay_z_cm,
             overlay_ok=overlay_ok)
 
-    def filename(self, z: int, n: int, params: dict[str, float]) -> str:
+    def filename(self, a_mass: int, params: dict[str, float]) -> str:
         betas = "_".join(f"{params[f'beta{i}']:.2f}" for i in range(1, N_BETAS + 1))
-        return f"{z}_{n}_{betas}.png"
+        return f"A{a_mass}_{betas}.png"
 
     def energy_requests(self, params: dict[str, float],
                         result: ShapeResult) -> list[EnergyRequest]:

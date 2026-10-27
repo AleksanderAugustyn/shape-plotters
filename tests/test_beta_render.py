@@ -190,8 +190,8 @@ def test_slider_specs_and_filename(render: BetaRender) -> None:
     assert (render.slider_specs[0].vmin, render.slider_specs[0].vmax) == (-1.6, 1.6)
     assert (render.slider_specs[1].vmin, render.slider_specs[1].vmax) == (0.0, 4.0)
     assert render.has_extra_panel is False
-    name = render.filename(92, 144, _params([0.0, 1.25]))
-    assert name == "92_144_0.00_1.25_0.00_0.00_0.00_0.00_0.00_0.00.png"
+    name = render.filename(236, _params([0.0, 1.25]))
+    assert name == "A236_0.00_1.25_0.00_0.00_0.00_0.00_0.00_0.00.png"
 
 
 def test_energy_requests_single_without_overlay(render: BetaRender) -> None:

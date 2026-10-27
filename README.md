@@ -28,9 +28,12 @@ the plot shows exactly the shape the model evaluates.
 - **Invalid shapes** stay on screen, greyed, with the library's status as the
   panel title.
 
-Controls: ± nudge buttons on every slider, an fm / R₀ unit toggle with Z and N
-boxes (R₀ = 1.16 A^(1/3) fm), Reset, and Save (300 dpi PNG named after the
-parameters, written to the current directory). Red dotted marks on the FoS
+Controls: ± nudge buttons on every slider, an A slider for the mass number
+behind the fm / R₀ unit toggle (R₀ = 1.16 A^(1/3) fm), Reset, and Save
+(300 dpi PNG named after A and the parameters, written to the current
+directory). A Z box appears only when the optional WMMM energy overlay is
+installed; the energy is computed for the nucleus (Z, N = A − Z) and nothing
+else depends on Z. Red dotted marks on the FoS
 sliders are practical limits.
 
 While a slider is dragged the axes hold still, so the shape visibly changes
