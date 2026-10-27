@@ -287,7 +287,7 @@ def test_energy_click_appends_block_and_any_change_clears(monkeypatch) -> None:
     assert "WMMM" not in a.stats_text.get_text()
     a._on_energy()
     assert "WMMM" in a.stats_text.get_text()
-    a.z_box._submit("94")                        # Z/N change clears too
+    a.z_box._submit("94")                        # Z change clears too
     assert "WMMM" not in a.stats_text.get_text()
     import matplotlib.pyplot as plt
     plt.close(a.fig)

@@ -89,44 +89,51 @@ def test_a_row_draws_are_suppressed(app) -> None:
     assert not [w for w in widgets if getattr(w, "drawon", False)]
 
 
-def test_zn_boxes_absent_without_wmmm(app) -> None:
-    assert app.z_box is None and app.n_box is None
+def test_z_box_absent_without_wmmm(app) -> None:
+    assert app.z_box is None
+    assert not hasattr(app, "n_box")                      # N is A - Z, never an input
 
 
-def test_zn_boxes_present_with_wmmm_and_feed_only_the_energy_call(monkeypatch) -> None:
+def test_z_box_present_with_wmmm_and_n_follows_from_a(monkeypatch) -> None:
     calls: list = []
     _with_wmmm(monkeypatch, calls)
     a = ShapePlotterApp(BetaRender())
-    assert a.z_box is not None and a.n_box is not None
-    assert (a.z_box.value, a.n_box.value) == (92, 144)
+    assert a.z_box is not None
+    assert a.z_box.value == 92
     a.z_box._submit("94")
-    a.n_box._submit("146")
+    a.a_row.slider.set_val(240)
     a._on_energy()
-    assert calls == [(94, 146)]
-    assert a.mass_number == 236                           # Z/N never move the slider
-    assert a._scale() == pytest.approx(R0_FM * 236 ** (1.0 / 3.0))
+    assert calls == [(94, 146)]                           # N = A - Z
+    assert a.mass_number == 240                           # Z never moves the slider
     _close(a)
 
 
-def test_zn_boxes_sit_in_the_right_column_beside_the_energy_button(monkeypatch) -> None:
+def test_z_box_sits_in_the_right_column_beside_the_energy_button(monkeypatch) -> None:
     _with_wmmm(monkeypatch)
     a = ShapePlotterApp(BetaRender())
     energy_box = a.btn_energy.ax.get_position()
-    for box in (a.z_box, a.n_box):
-        pos = box.box.ax.get_position()
-        assert pos.x0 >= 0.8                              # right column, not the slider stack
-        assert abs(pos.y0 - energy_box.y0) < 0.12         # next to the button, not up at the old slot
+    pos = a.z_box.box.ax.get_position()
+    assert pos.x0 >= 0.8                                  # right column, not the slider stack
+    assert abs(pos.y0 - energy_box.y0) < 0.12             # next to the button, not up at the old slot
     _close(a)
 
 
-def test_energy_block_warns_when_z_plus_n_differs_from_a(monkeypatch) -> None:
+def test_energy_block_names_the_nucleus(monkeypatch) -> None:
     _with_wmmm(monkeypatch)
     a = ShapePlotterApp(BetaRender())
     a._on_energy()
-    assert "≠ A" not in a.stats_text.get_text()
-    a.a_row.slider.set_val(240)                            # Z + N stays 236
+    assert "Z = 92  N = 144" in a.stats_text.get_text()
+    _close(a)
+
+
+def test_energy_refuses_z_not_below_a(monkeypatch) -> None:
+    calls: list = []
+    _with_wmmm(monkeypatch, calls)
+    a = ShapePlotterApp(BetaRender())
+    a.a_row.slider.set_val(92)                            # A = Z -> N = 0
     a._on_energy()
-    assert "Z+N = 236 ≠ A = 240" in a.stats_text.get_text()
+    assert calls == []
+    assert "WMMM: Z = 92 is not below A = 92" in a.stats_text.get_text()
     _close(a)
 
 

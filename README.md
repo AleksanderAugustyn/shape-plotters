@@ -31,8 +31,9 @@ the plot shows exactly the shape the model evaluates.
 Controls: ± nudge buttons on every slider, an A slider for the mass number
 behind the fm / R₀ unit toggle (R₀ = 1.16 A^(1/3) fm), Reset, and Save
 (300 dpi PNG named after A and the parameters, written to the current
-directory). Z and N boxes appear only when the optional WMMM energy overlay
-is installed; nothing else depends on them. Red dotted marks on the FoS
+directory). A Z box appears only when the optional WMMM energy overlay is
+installed; the energy is computed for the nucleus (Z, N = A − Z) and nothing
+else depends on Z. Red dotted marks on the FoS
 sliders are practical limits.
 
 While a slider is dragged the axes hold still, so the shape visibly changes

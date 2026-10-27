@@ -194,19 +194,17 @@ class ShapePlotterApp:
         self.checks.on_clicked(self._on_check)
         self.btn_energy = None
         self.z_box: IntTextBox | None = None
-        self.n_box: IntTextBox | None = None
         if energy.available():
             # Right column, below the toggle block; absent (layout untouched)
-            # when the local WMMM install is missing. Z and N exist only for
-            # the energy call, so they live beside the button that uses them.
+            # when the local WMMM install is missing. Z exists only for the
+            # energy call (N = A - Z), so it lives beside the button that
+            # uses it.
             y_energy = 0.26 - 0.04 * n - 0.045
             self.btn_energy = Button(
                 self.fig.add_axes((0.86, y_energy, 0.10, 0.030)), "Energy")
             self.btn_energy.on_clicked(self._on_energy)
             self.z_box = IntTextBox(self.fig, (0.88, y_energy - 0.04, 0.06, 0.030),
-                                    "Z ", 92, self._on_zn)
-            self.n_box = IntTextBox(self.fig, (0.88, y_energy - 0.08, 0.06, 0.030),
-                                    "N ", 144, self._on_zn)
+                                    "Z ", 92, self._on_z)
         self._suppress_widget_draws()
 
     @property
@@ -256,8 +254,8 @@ class ShapePlotterApp:
         self._reposition_scission()
         self.update()
 
-    def _on_zn(self) -> None:
-        # Z and N feed only the energy call; the shape and its scale are
+    def _on_z(self) -> None:
+        # Z feeds only the energy call; the shape and its scale are
         # untouched, so only the energy block goes stale.
         self._energy_lines = []
         self._refresh_stats()
@@ -304,26 +302,25 @@ class ShapePlotterApp:
 
     def _on_energy(self, _event=None) -> None:
         result = self.last_result
-        if self.z_box is None or self.n_box is None:
+        if self.z_box is None:
             return                      # no energy overlay without WMMM
+        z, a_mass = self.z_box.value, self.mass_number
+        n = a_mass - z
         if result is None or not result.ok:
             self._energy_lines = ["", "WMMM: shape invalid (not computed)"]
+        elif n <= 0:
+            self._energy_lines = ["", f"WMMM: Z = {z} is not below A = {a_mass}"]
         else:
             params = {k: row.slider.val for k, row in self.rows.items()}
             requests = self.render.energy_requests(params, result)
-            z, n = self.z_box.value, self.n_box.value
-            lines: list[str] = []
+            # N is derived, so show the nucleus the energy belongs to.
+            lines: list[str] = ["", f"WMMM: Z = {z}  N = {n}  A = {a_mass}"]
             for req in requests:
                 res = energy.compute(
                     req.param_type, z, n,
                     req.shape, com_correction=req.com_correction)
                 lines += self._energy_block(
                     req.label if len(requests) > 1 else None, res)
-            if z + n != self.mass_number:
-                # The shape's scale and mass split follow the A slider; the
-                # energy follows the boxes. Say so instead of silently
-                # mixing two nuclei.
-                lines += ["", f"WMMM: Z+N = {z + n} ≠ A = {self.mass_number}"]
             self._energy_lines = lines
         self._refresh_stats()
         self.fig.canvas.draw_idle()
