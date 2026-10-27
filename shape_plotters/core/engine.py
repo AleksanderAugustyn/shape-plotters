@@ -419,7 +419,8 @@ class ShapePlotterApp:
                 self.rtheta_zcm.set_data([result.overlay_z_cm * scale], [0.0])
         else:
             zc_r = quadrature.z_cm(result.theta, result.radius) * scale
-            show_rtheta = bool(result.ok and abs(zc_r - zc) > 1e-6 * (1.0 + abs(zc)))
+            show_rtheta = bool(result.ok and result.infer_rtheta_overlay
+                               and abs(zc_r - zc) > 1e-6 * (1.0 + abs(zc)))
             if show_rtheta:
                 zr = result.radius * np.cos(result.theta) * scale
                 rr = result.radius * np.sin(result.theta) * scale
@@ -589,6 +590,7 @@ class ShapePlotterApp:
                 lines.append(f"{key} = {val * scale:.4f} {unit}")
             else:
                 lines.append(f"{key} = {val:.4f}")
+        lines.extend(result.notes)
         if result.neck is not None:
             lines += [f"neck ({result.neck.source}):",
                       f"  z = {result.neck.z * scale:.4f} {unit}",
