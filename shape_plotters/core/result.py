@@ -86,6 +86,7 @@ class ShapeResult:
     overlay_rho: Array | None = None
     overlay_z_cm: float = 0.0
     overlay_ok: bool = True           # False => corrected shape is invalid; grey the overlay
+    notes: tuple[str, ...] = ()       # free-text stats lines, after the scalars
 
     @property
     def ok(self) -> bool:

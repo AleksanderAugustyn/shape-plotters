@@ -1,4 +1,6 @@
 """Engine smoke tests under Agg: full draw path, unit toggle, invalid greying."""
+import dataclasses
+
 import numpy as np
 import pytest
 
@@ -335,4 +337,15 @@ def test_energy_error_and_invalid_results_render(monkeypatch) -> None:
     text = a.stats_text.get_text()
     assert "WMMM: error" in text and "boom" in text
     import matplotlib.pyplot as plt
+    plt.close(a.fig)
+
+
+def test_stats_block_prints_notes() -> None:
+    import matplotlib.pyplot as plt
+    a = ShapePlotterApp(FoSRender())
+    res = a.render.compute({"c": 1.0, "a3": 0.0, "a4": 0.0, "a5": 0.0, "a6": 0.0, "a7": 0.0, "a8": 0.0}, {})
+    noted = dataclasses.replace(res, notes=("middle: one_sheet (waist inside)",))
+    block = a._stats_block(noted, 1.0, "R0", 0.0, 0.0, 0.0)
+    assert "middle: one_sheet (waist inside)" in block.splitlines()
+    assert a._stats_block(res, 1.0, "R0", 0.0, 0.0, 0.0).count("\n") == block.count("\n") - 1
     plt.close(a.fig)

@@ -589,6 +589,7 @@ class ShapePlotterApp:
                 lines.append(f"{key} = {val * scale:.4f} {unit}")
             else:
                 lines.append(f"{key} = {val:.4f}")
+        lines.extend(result.notes)
         if result.neck is not None:
             lines += [f"neck ({result.neck.source}):",
                       f"  z = {result.neck.z * scale:.4f} {unit}",
