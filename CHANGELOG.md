@@ -6,6 +6,20 @@ Notable changes to shape-plotters. Versions follow semantic versioning.
 
 ### Added
 
+- **`funnyhills` render** over funnyhills-parameterization (the {c, h, α}
+  shapes of Brack et al. 1972). Three sliders, c, h and α, in steps of 0.01,
+  0.005 and 0.01 so the paper's grid and the 240Pu stationary points are
+  reachable, starting from the sphere; markers at c = 1, h = 0 (the valley
+  line) and α = 0. The ρ(z) panel is the library's uniform-z profile; the
+  neck, the poles and the shape flags come from the library, and a pinched
+  or separated shape draws both fragments and the split plane. The stats
+  block shows A, B, z_shift, the gap and the fragments' volume over 4π/3
+  (when separated: past scission the paper's normalization over-fills them),
+  ρ_cm, q2, d_min and the ellipsoid and scission lines h_ell(c) and h_sc(c),
+  with a note naming the branch (polynomial or exponential) and whether the
+  shape is necked, pinched or separated. The render is registered only when
+  `funnyhills_parameterization` is importable: the library is not on PyPI
+  yet.
 - **`cassini` render** over cassini-parameterization (Pashkevich's Cassini
   ovals). Five sliders, α and the Legendre coefficients α1 to α4, all in
   steps of 0.025 so the paper's lattice is reachable, starting from the

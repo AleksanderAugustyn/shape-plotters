@@ -1,4 +1,4 @@
-"""Command-line entry point: shape-plotters beta|fos|tqs|cassini (or python -m shape_plotters)."""
+"""Command-line entry point: shape-plotters beta|fos|tqs|cassini|funnyhills (or python -m shape_plotters)."""
 from __future__ import annotations
 
 import argparse
@@ -11,15 +11,18 @@ from shape_plotters.renders.fos import FoSRender
 
 RENDERS = {"beta": BetaRender, "fos": FoSRender}
 
-# tqs- and cassini-parameterization are not on PyPI yet (locally built
-# wheels), so they are not dependencies: register each render only where its
-# package is installed.
+# tqs-, cassini- and funnyhills-parameterization are not on PyPI yet (locally
+# built wheels), so they are not dependencies: register each render only where
+# its package is installed.
 if importlib.util.find_spec("tqs_parameterization") is not None:
     from shape_plotters.renders.tqs import TqsRender
     RENDERS["tqs"] = TqsRender
 if importlib.util.find_spec("cassini_parameterization") is not None:
     from shape_plotters.renders.cassini import CassiniRender
     RENDERS["cassini"] = CassiniRender
+if importlib.util.find_spec("funnyhills_parameterization") is not None:
+    from shape_plotters.renders.funnyhills import FunnyhillsRender
+    RENDERS["funnyhills"] = FunnyhillsRender
 
 
 def main(argv: Sequence[str] | None = None) -> None:
