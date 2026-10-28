@@ -9,6 +9,7 @@ shared engine draws the figure; each shape parameterization is a render module.
 | `beta` | spherical-harmonic (Legendre) expansion | β1–β8 | [beta-parameterization](https://github.com/AleksanderAugustyn/beta-parameterization) |
 | `fos` | Fourier-over-Spheroid | c, a3–a8 | [fos-parameterization](https://github.com/AleksanderAugustyn/fos-parameterization) |
 | `tqs` | three quadratic surfaces (Nix) | σ1, σ2, σ3, α2, α3 | tqs-parameterization (optional, not yet on PyPI; see Run) |
+| `cassini` | Cassini ovals (Pashkevich) | α, α1–α4 | cassini-parameterization (optional, not yet on PyPI; see Run) |
 
 The shapes are not re-implemented here. R(θ) and the analytic dR/dθ come from
 the compiled libraries, evaluated on a 2048-node Gauss-Legendre grid in cos θ.
@@ -67,12 +68,14 @@ rendering sluggish (~5× slower).
     shape-plotters beta
     shape-plotters fos
     shape-plotters tqs
+    shape-plotters cassini
 
 `python -m shape_plotters beta` does the same.
 
-`tqs` appears only when `tqs-parameterization` is installed. It is not on
-PyPI yet: install it from a wheel built locally in the library repo. Without
-it, `beta` and `fos` work as usual and `--help` lists only those two.
+`tqs` appears only when `tqs-parameterization` is installed, and `cassini`
+only when `cassini-parameterization` is. Neither is on PyPI yet: install each
+from a wheel built locally in its library repo. Without them, `beta` and `fos`
+work as usual and `--help` lists only those two.
 
 ## Energy button
 

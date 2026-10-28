@@ -12,6 +12,8 @@ from shape_plotters.renders.fos import FoSRender
 
 _real_find_spec = importlib.util.find_spec
 HAS_TQS = importlib.util.find_spec("tqs_parameterization") is not None
+HAS_CASSINI = importlib.util.find_spec("cassini_parameterization") is not None
+_OPTIONAL = ("tqs_parameterization", "cassini_parameterization")
 
 
 class _SpyApp:
@@ -45,6 +47,7 @@ def test_module_is_runnable() -> None:
     assert out.returncode == 0, out.stderr
     assert "beta" in out.stdout and "fos" in out.stdout
     assert ("tqs" in out.stdout) == HAS_TQS
+    assert ("cassini" in out.stdout) == HAS_CASSINI
 
 
 @pytest.mark.skipif(not HAS_TQS, reason="tqs_parameterization not installed")
@@ -57,15 +60,34 @@ def test_tqs_registered_when_importable(monkeypatch) -> None:
     assert type(app.render) is TqsRender and app.ran
 
 
-def test_registry_without_tqs(monkeypatch) -> None:
-    # Re-import cli with find_spec answering None for the package: the
-    # registry has exactly beta and fos (CI and any machine without the wheel).
+@pytest.mark.skipif(not HAS_CASSINI, reason="cassini_parameterization not installed")
+def test_cassini_registered_when_importable(monkeypatch) -> None:
+    from shape_plotters.renders.cassini import CassiniRender
+    _SpyApp.instances = []
+    monkeypatch.setattr(cli, "ShapePlotterApp", _SpyApp)
+    cli.main(["cassini"])
+    (app,) = _SpyApp.instances
+    assert type(app.render) is CassiniRender and app.ran
+
+
+def _registry_hiding(monkeypatch, hidden: tuple[str, ...]) -> list[str]:
+    """Re-import cli with find_spec answering None for the hidden packages."""
     monkeypatch.setattr(importlib.util, "find_spec",
-                        lambda name, *a, **k: None if name == "tqs_parameterization"
+                        lambda name, *a, **k: None if name in hidden
                         else _real_find_spec(name, *a, **k))
     try:
-        fresh = importlib.reload(cli)
-        assert sorted(fresh.RENDERS) == ["beta", "fos"]
+        return sorted(importlib.reload(cli).RENDERS)
     finally:
         monkeypatch.undo()
         importlib.reload(cli)   # restore with the real find_spec
+
+
+def test_registry_without_optional_packages(monkeypatch) -> None:
+    # CI and any machine without the local wheels: exactly beta and fos.
+    assert _registry_hiding(monkeypatch, _OPTIONAL) == ["beta", "fos"]
+
+
+def test_registry_without_cassini_only(monkeypatch) -> None:
+    renders = _registry_hiding(monkeypatch, ("cassini_parameterization",))
+    assert "cassini" not in renders
+    assert ("tqs" in renders) == HAS_TQS

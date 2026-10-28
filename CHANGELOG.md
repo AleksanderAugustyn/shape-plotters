@@ -6,6 +6,17 @@ Notable changes to shape-plotters. Versions follow semantic versioning.
 
 ### Added
 
+- **`cassini` render** over cassini-parameterization (Pashkevich's Cassini
+  ovals). Five sliders, α and the Legendre coefficients α1 to α4, all in
+  steps of 0.025 so the paper's lattice is reachable, starting from the
+  sphere; markers at α = 0.95 and 1.0 and at ±0.25 on α1, α3, α4. The ρ(z)
+  panel is the library's parametric profile, so a dimpled shape draws as it
+  is, with the R(θ) outline over it; the neck, the poles and the shape flags
+  come from the library, and a pinched or separated shape draws both
+  fragments and the split plane. The stats block shows ε, c, z_shift, the gap
+  (when separated), q2, d_min and whether the profile is folded. The render
+  is registered only when `cassini_parameterization` is importable: the
+  library is not on PyPI yet.
 - **`tqs` render** over tqs-parameterization (Nix's three quadratic
   surfaces). Five sliders, σ1, σ2, σ3, α2 and α3, with the sphere point
   marked, starting from a necked shape. The ρ(z) panel, the neck, the poles
@@ -23,6 +34,14 @@ Notable changes to shape-plotters. Versions follow semantic versioning.
 
 ### Changed
 
+- **Fragment volumes follow the profile curve.** `fragment_volumes`
+  integrates π ρ² dz in the profile's own order with signed dz and splits
+  the curve where it crosses the neck plane, instead of sorting by z. A
+  dimpled (folded) profile is multi-valued in z and lost several percent of
+  its volume to the sort; single-valued profiles give the same numbers.
+- **A zero-radius neck is drawn.** A neck with ρ = 0 (a pinched or
+  separated shape) is drawn as a short split-plane marker instead of a
+  point.
 - **A slider replaces the Z and N boxes.** The spherical volume depends on
   A alone, so the mass number is now a slider (16 to 300, step 1) at the top
   of the slider stack. It drives the fm / R₀ scale, the scission-band
