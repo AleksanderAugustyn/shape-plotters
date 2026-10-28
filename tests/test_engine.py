@@ -365,3 +365,39 @@ def test_no_rtheta_overlay_for_tqs_steep_shape() -> None:
     assert not a.rtheta_zcm.get_visible()
     assert not a.shape_legend.get_visible()
     plt.close(a.fig)
+
+
+def test_zero_radius_neck_line_is_visible(monkeypatch) -> None:
+    # A pinched or separated shape has rho_neck = 0: its split plane is drawn
+    # with a fixed display half-height instead of collapsing to a point.
+    import matplotlib.pyplot as plt
+    from shape_plotters.core.engine import NECK_LINE_MIN_HALF_HEIGHT
+    from shape_plotters.core.result import NeckInfo
+    a = ShapePlotterApp(FoSRender())
+    a._on_check("fm units")                       # -> R0 units, scale 1
+    base = a.last_result
+    for rho_neck, half in ((0.0, NECK_LINE_MIN_HALF_HEIGHT), (0.3, 0.3)):
+        res = dataclasses.replace(base, neck=NeckInfo(z=0.1, rho=rho_neck, depth=0.0, source="lib"))
+        monkeypatch.setattr(a.render, "compute", lambda params, toggles, res=res: res)
+        a.update()
+        assert a.neck_line.get_visible()
+        xs, ys = a.neck_line.get_data()
+        assert list(xs) == pytest.approx([0.1, 0.1])
+        assert list(ys) == pytest.approx([-half, half])
+    plt.close(a.fig)
+
+
+def test_fos_asymmetric_shape_keeps_its_fragment_split() -> None:
+    # fos's R(θ)-frame north pole (0.95) lies inside its profile (which reaches
+    # z = 2.39) and below the neck plane (1.44): the split must still show.
+    import re
+    import matplotlib.pyplot as plt
+    a = ShapePlotterApp(FoSRender())
+    shape = dict(c=2.02, a3=0.48, a4=-0.07, a5=0.18, a6=-0.08, a7=-0.03, a8=0.13)
+    for key, val in shape.items():
+        a.rows[key].slider.set_val(val)
+    assert a.last_result.ok and a.last_result.neck is not None
+    vol = re.search(r"vol frac = ([\d.]+) : ([\d.]+)", a.stats_text.get_text())
+    assert vol is not None
+    assert (float(vol.group(1)), float(vol.group(2))) == (0.92, 0.08)
+    plt.close(a.fig)
