@@ -2,7 +2,7 @@
 
 Notable changes to shape-plotters. Versions follow semantic versioning.
 
-## Unreleased
+## 0.3.0
 
 ### Added
 
@@ -17,9 +17,7 @@ Notable changes to shape-plotters. Versions follow semantic versioning.
   (when separated: past scission the paper's normalization over-fills them),
   ρ_cm, q2, d_min and the ellipsoid and scission lines h_ell(c) and h_sc(c),
   with a note naming the branch (polynomial or exponential) and whether the
-  shape is necked, pinched or separated. The render is registered only when
-  `funnyhills_parameterization` is importable: the library is not on PyPI
-  yet.
+  shape is necked, pinched or separated.
 - **`cassini` render** over cassini-parameterization (Pashkevich's Cassini
   ovals). Five sliders, α and the Legendre coefficients α1 to α4, all in
   steps of 0.025 so the paper's lattice is reachable, starting from the
@@ -28,9 +26,7 @@ Notable changes to shape-plotters. Versions follow semantic versioning.
   is, with the R(θ) outline over it; the neck, the poles and the shape flags
   come from the library, and a pinched or separated shape draws both
   fragments and the split plane. The stats block shows ε, c, z_shift, the gap
-  (when separated), q2, d_min and whether the profile is folded. The render
-  is registered only when `cassini_parameterization` is importable: the
-  library is not on PyPI yet.
+  (when separated), q2, d_min and whether the profile is folded.
 - **`tqs` render** over tqs-parameterization (Nix's three quadratic
   surfaces). Five sliders, σ1, σ2, σ3, α2 and α3, with the sphere point
   marked, starting from a necked shape. The ρ(z) panel, the neck, the poles
@@ -38,8 +34,7 @@ Notable changes to shape-plotters. Versions follow semantic versioning.
   shape draws both fragments and the split plane. The stats block shows the
   joins z1 and z2, u, α1, Möller's σ1t and (for σ2 < 0) the scission locus
   σ1*, Möller's d, q2, αg, εf1 and εf2, the 240Pu quadrupole moment in barns,
-  and the middle-body kind. The render is registered only when
-  `tqs_parameterization` is importable: the library is not on PyPI yet.
+  and the middle-body kind.
 - **`ShapeResult.notes`**: free-text lines a render adds to the stats block,
   printed after the scalars.
 - **`ShapeResult.infer_rtheta_overlay`** (default True): a render whose R(θ)
@@ -48,6 +43,10 @@ Notable changes to shape-plotters. Versions follow semantic versioning.
 
 ### Changed
 
+- **Three more pinned libraries.** tqs-parameterization, cassini-parameterization
+  and funnyhills-parameterization are dependencies, pinned at 0.1.0 from PyPI
+  like beta and fos. The `tqs`, `cassini` and `funnyhills` renders are always
+  registered and `--help` lists all five.
 - **Fragment volumes follow the profile curve.** `fragment_volumes` no
   longer sorts the profile by z. It integrates π ρ² dz in the profile's own
   order with signed dz, and clips every segment at the neck plane, so it is

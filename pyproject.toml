@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "shape-plotters"
-description = "Interactive matplotlib plotters for axially symmetric nuclear shapes (beta, FoS)"
+description = "Interactive matplotlib plotters for axially symmetric nuclear shapes (beta, FoS, TQS, Cassini, Funny Hills)"
 readme = "README.md"
 license = "MIT"
 license-files = ["LICENSE"]
@@ -19,6 +19,9 @@ dependencies = [
     # Exact pins: each render is written against one library API version.
     "beta-parameterization==4.0.1",
     "fos-parameterization==3.0.0",
+    "tqs-parameterization==0.1.0",
+    "cassini-parameterization==0.1.0",
+    "funnyhills-parameterization==0.1.0",
 ]
 dynamic = ["version"]
 

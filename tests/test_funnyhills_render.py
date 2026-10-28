@@ -2,10 +2,8 @@
 import numpy as np
 import pytest
 
-pytest.importorskip("funnyhills_parameterization")
-
-from shape_plotters.core import nodes  # noqa: E402
-from shape_plotters.renders.funnyhills import FunnyhillsRender  # noqa: E402
+from shape_plotters.core import nodes
+from shape_plotters.renders.funnyhills import FunnyhillsRender
 
 SPHERE = dict(c=1.0, h=0.0, alpha=0.0)
 GS = dict(c=1.21, h=-0.15, alpha=0.0)

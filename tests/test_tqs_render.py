@@ -4,10 +4,8 @@ import math
 import numpy as np
 import pytest
 
-pytest.importorskip("tqs_parameterization")
-
-from shape_plotters.core import nodes  # noqa: E402
-from shape_plotters.renders.tqs import TqsRender  # noqa: E402
+from shape_plotters.core import nodes
+from shape_plotters.renders.tqs import TqsRender
 
 SPHERE = dict(sigma1=0.0, sigma2=1.0, sigma3=1.0, alpha2=0.0, alpha3=0.0)
 INITIAL = dict(sigma1=2.4, sigma2=-1.0, sigma3=1.0, alpha2=0.0, alpha3=0.0)

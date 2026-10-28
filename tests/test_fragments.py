@@ -1,4 +1,5 @@
 """Cylindrical fragment volumes vs analytic sphere / spherical-cap values."""
+import cassini_parameterization as cp
 import numpy as np
 import pytest
 
@@ -63,7 +64,6 @@ def test_split_at_neck_crossing_not_by_sort() -> None:
     # FOLD_BOX: a dimpled Cassini shape inside the paper's box, split at the
     # library neck. 4001 profile nodes put the trapezoid error below 1e-6 (at
     # the render's 721 it is 1.5e-5); the old sort lost 0.22 of the south part.
-    cp = pytest.importorskip("cassini_parameterization")
     fold_box = [0.125, 0.25, 0.0, 0.2, -0.175]
     prof = cp.rho_profile(fold_box, 4001)
     nk = cp.neck(fold_box)

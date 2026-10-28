@@ -2,27 +2,22 @@
 from __future__ import annotations
 
 import argparse
-import importlib.util
 from collections.abc import Sequence
 
 from shape_plotters.core.engine import ShapePlotterApp
 from shape_plotters.renders.beta import BetaRender
+from shape_plotters.renders.cassini import CassiniRender
 from shape_plotters.renders.fos import FoSRender
+from shape_plotters.renders.funnyhills import FunnyhillsRender
+from shape_plotters.renders.tqs import TqsRender
 
-RENDERS = {"beta": BetaRender, "fos": FoSRender}
-
-# tqs-, cassini- and funnyhills-parameterization are not on PyPI yet (locally
-# built wheels), so they are not dependencies: register each render only where
-# its package is installed.
-if importlib.util.find_spec("tqs_parameterization") is not None:
-    from shape_plotters.renders.tqs import TqsRender
-    RENDERS["tqs"] = TqsRender
-if importlib.util.find_spec("cassini_parameterization") is not None:
-    from shape_plotters.renders.cassini import CassiniRender
-    RENDERS["cassini"] = CassiniRender
-if importlib.util.find_spec("funnyhills_parameterization") is not None:
-    from shape_plotters.renders.funnyhills import FunnyhillsRender
-    RENDERS["funnyhills"] = FunnyhillsRender
+RENDERS = {
+    "beta": BetaRender,
+    "fos": FoSRender,
+    "tqs": TqsRender,
+    "cassini": CassiniRender,
+    "funnyhills": FunnyhillsRender,
+}
 
 
 def main(argv: Sequence[str] | None = None) -> None:

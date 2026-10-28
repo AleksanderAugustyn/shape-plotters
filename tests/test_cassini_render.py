@@ -2,10 +2,8 @@
 import numpy as np
 import pytest
 
-pytest.importorskip("cassini_parameterization")
-
-from shape_plotters.core import fragments, nodes  # noqa: E402
-from shape_plotters.renders.cassini import PARAM_KEYS, CassiniRender  # noqa: E402
+from shape_plotters.core import fragments, nodes
+from shape_plotters.renders.cassini import PARAM_KEYS, CassiniRender
 
 
 def _vec(*values: float) -> dict[str, float]:

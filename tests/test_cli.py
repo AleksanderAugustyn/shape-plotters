@@ -1,6 +1,4 @@
 """Command-line entry: the render argument picks the render the app is built on."""
-import importlib
-import importlib.util
 import subprocess
 import sys
 
@@ -8,13 +6,18 @@ import pytest
 
 from shape_plotters import cli
 from shape_plotters.renders.beta import BetaRender
+from shape_plotters.renders.cassini import CassiniRender
 from shape_plotters.renders.fos import FoSRender
+from shape_plotters.renders.funnyhills import FunnyhillsRender
+from shape_plotters.renders.tqs import TqsRender
 
-_real_find_spec = importlib.util.find_spec
-HAS_TQS = importlib.util.find_spec("tqs_parameterization") is not None
-HAS_CASSINI = importlib.util.find_spec("cassini_parameterization") is not None
-HAS_FUNNYHILLS = importlib.util.find_spec("funnyhills_parameterization") is not None
-_OPTIONAL = ("tqs_parameterization", "cassini_parameterization", "funnyhills_parameterization")
+RENDER_CLASSES = {
+    "beta": BetaRender,
+    "fos": FoSRender,
+    "tqs": TqsRender,
+    "cassini": CassiniRender,
+    "funnyhills": FunnyhillsRender,
+}
 
 
 class _SpyApp:
@@ -31,7 +34,11 @@ class _SpyApp:
         self.ran = True
 
 
-@pytest.mark.parametrize("name, render_cls", [("beta", BetaRender), ("fos", FoSRender)])
+def test_registry_lists_every_render() -> None:
+    assert cli.RENDERS == RENDER_CLASSES
+
+
+@pytest.mark.parametrize("name, render_cls", sorted(RENDER_CLASSES.items()))
 def test_render_argument_selects_render(monkeypatch, name: str, render_cls: type) -> None:
     _SpyApp.instances = []
     monkeypatch.setattr(cli, "ShapePlotterApp", _SpyApp)
@@ -46,68 +53,5 @@ def test_module_is_runnable() -> None:
     out = subprocess.run([sys.executable, "-m", "shape_plotters", "--help"],
                          capture_output=True, text=True, timeout=120)
     assert out.returncode == 0, out.stderr
-    assert "beta" in out.stdout and "fos" in out.stdout
-    assert ("tqs" in out.stdout) == HAS_TQS
-    assert ("cassini" in out.stdout) == HAS_CASSINI
-    assert ("funnyhills" in out.stdout) == HAS_FUNNYHILLS
-
-
-@pytest.mark.skipif(not HAS_TQS, reason="tqs_parameterization not installed")
-def test_tqs_registered_when_importable(monkeypatch) -> None:
-    from shape_plotters.renders.tqs import TqsRender
-    _SpyApp.instances = []
-    monkeypatch.setattr(cli, "ShapePlotterApp", _SpyApp)
-    cli.main(["tqs"])
-    (app,) = _SpyApp.instances
-    assert type(app.render) is TqsRender and app.ran
-
-
-@pytest.mark.skipif(not HAS_CASSINI, reason="cassini_parameterization not installed")
-def test_cassini_registered_when_importable(monkeypatch) -> None:
-    from shape_plotters.renders.cassini import CassiniRender
-    _SpyApp.instances = []
-    monkeypatch.setattr(cli, "ShapePlotterApp", _SpyApp)
-    cli.main(["cassini"])
-    (app,) = _SpyApp.instances
-    assert type(app.render) is CassiniRender and app.ran
-
-
-@pytest.mark.skipif(not HAS_FUNNYHILLS, reason="funnyhills_parameterization not installed")
-def test_funnyhills_registered_when_importable(monkeypatch) -> None:
-    from shape_plotters.renders.funnyhills import FunnyhillsRender
-    _SpyApp.instances = []
-    monkeypatch.setattr(cli, "ShapePlotterApp", _SpyApp)
-    cli.main(["funnyhills"])
-    (app,) = _SpyApp.instances
-    assert type(app.render) is FunnyhillsRender and app.ran
-
-
-def _registry_hiding(monkeypatch, hidden: tuple[str, ...]) -> list[str]:
-    """Re-import cli with find_spec answering None for the hidden packages."""
-    monkeypatch.setattr(importlib.util, "find_spec",
-                        lambda name, *a, **k: None if name in hidden
-                        else _real_find_spec(name, *a, **k))
-    try:
-        return sorted(importlib.reload(cli).RENDERS)
-    finally:
-        monkeypatch.undo()
-        importlib.reload(cli)   # restore with the real find_spec
-
-
-def test_registry_without_optional_packages(monkeypatch) -> None:
-    # CI and any machine without the local wheels: exactly beta and fos.
-    assert _registry_hiding(monkeypatch, _OPTIONAL) == ["beta", "fos"]
-
-
-def test_registry_without_cassini_only(monkeypatch) -> None:
-    renders = _registry_hiding(monkeypatch, ("cassini_parameterization",))
-    assert "cassini" not in renders
-    assert ("tqs" in renders) == HAS_TQS
-    assert ("funnyhills" in renders) == HAS_FUNNYHILLS
-
-
-def test_registry_without_funnyhills_only(monkeypatch) -> None:
-    renders = _registry_hiding(monkeypatch, ("funnyhills_parameterization",))
-    assert "funnyhills" not in renders
-    assert ("tqs" in renders) == HAS_TQS
-    assert ("cassini" in renders) == HAS_CASSINI
+    for name in RENDER_CLASSES:
+        assert name in out.stdout
