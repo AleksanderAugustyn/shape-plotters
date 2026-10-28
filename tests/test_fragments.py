@@ -87,3 +87,52 @@ def test_tips_close_the_void() -> None:
     v_below, v_above = fragments.fragment_volumes(z, rho, 0.0, -2.5, 2.5)
     assert v_below == pytest.approx(WHOLE, rel=1e-5)
     assert v_above == pytest.approx(WHOLE, rel=1e-5)
+
+
+def _slice_volumes(z: np.ndarray, rho: np.ndarray, z_plane: float,
+                   n_slices: int = 20001) -> tuple[float, float]:
+    """Oracle: body volume below/above a plane by slicing, independent of the
+    curve integral. At each z the horizontal line crosses the closed curve
+    (with the axis) at radii r1 < r2 < ...; the body is the union of the
+    intervals between them, so the slice area is pi * |r1^2 - r2^2 + ...|."""
+    def slab(lo: float, hi: float) -> float:
+        zs = np.linspace(lo, hi, n_slices)
+        areas = np.empty_like(zs)
+        for k, zk in enumerate(zs):
+            d0, d1 = z[:-1] - zk, z[1:] - zk
+            hit = d0 * d1 < 0.0
+            t = d0[hit] / (d0[hit] - d1[hit])
+            r = np.sort(rho[:-1][hit] + t * (rho[1:][hit] - rho[:-1][hit]))[::-1]
+            areas[k] = np.pi * abs(np.sum(r**2 * (-1.0) ** np.arange(r.size)))
+        return float(np.trapezoid(areas, zs))
+    return slab(z.min(), z_plane), slab(z_plane, z.max())
+
+
+def _dimpled_curve(n: int) -> tuple[np.ndarray, np.ndarray]:
+    # North pole dented to z = 0.65 while the rim around it rises to ~0.81.
+    t = np.linspace(0.0, np.pi, n)
+    return np.cos(t) - 0.35 * np.cos(t) * np.exp(-6.0 * t**2), np.sin(t)
+
+
+def test_dimple_reaching_past_the_neck_plane() -> None:
+    # The plane z = 0.75 lies between the dented pole and the rim: it cuts the
+    # dimple wall near the axis and the outer wall. Above it is only the rim.
+    z, rho = _dimpled_curve(4001)
+    oracle_below, oracle_above = _slice_volumes(z, rho, 0.75)
+    v_below, v_above = fragments.fragment_volumes(z, rho, 0.75, z_lo=z[-1], z_hi=z[0])
+    assert v_above == pytest.approx(oracle_above, rel=2e-3)
+    assert v_below == pytest.approx(oracle_below, rel=1e-4)
+
+
+@pytest.mark.parametrize("z_lo, z_hi", [(-0.3, 0.4), (0.0, 0.0)])
+def test_poles_inside_a_closed_profile(z_lo: float, z_hi: float) -> None:
+    # fos passes its R(θ)-frame poles (zero-filled on failure), which can lie
+    # inside its centre-of-mass profile; the profile already closes at rho = 0,
+    # so the caps run along the axis and must add nothing, even across z_neck.
+    t = np.linspace(0.0, np.pi, 4001)
+    z, rho = np.cos(t)[::-1], np.sin(t)[::-1]          # ascending, as fos
+    a = 0.5
+    cap = np.pi * (2.0 / 3.0 - a + a**3 / 3.0)
+    v_below, v_above = fragments.fragment_volumes(z, rho, a, z_lo, z_hi)
+    assert v_above == pytest.approx(cap, rel=1e-5)
+    assert v_below == pytest.approx(WHOLE - cap, rel=1e-5)

@@ -34,11 +34,14 @@ Notable changes to shape-plotters. Versions follow semantic versioning.
 
 ### Changed
 
-- **Fragment volumes follow the profile curve.** `fragment_volumes`
-  integrates π ρ² dz in the profile's own order with signed dz and splits
-  the curve where it crosses the neck plane, instead of sorting by z. A
-  dimpled (folded) profile is multi-valued in z and lost several percent of
-  its volume to the sort; single-valued profiles give the same numbers.
+- **Fragment volumes follow the profile curve.** `fragment_volumes` no
+  longer sorts the profile by z. It integrates π ρ² dz in the profile's own
+  order with signed dz, and clips every segment at the neck plane, so it is
+  exact for any closed profile. A dimpled (folded) profile is multi-valued
+  in z and lost volume to the sort: up to 5% on Cassini shapes, and up to
+  13% of a fragment on folded beta shapes. fos's split moves by up to 0.2%,
+  because its R(θ)-frame poles no longer dent its profile. Single-valued
+  beta and tqs profiles give the same numbers as before.
 - **A zero-radius neck is drawn.** A neck with ρ = 0 (a pinched or
   separated shape) is drawn as a short split-plane marker instead of a
   point.

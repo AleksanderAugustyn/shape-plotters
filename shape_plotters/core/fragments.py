@@ -11,8 +11,13 @@ z: sorting assumes a single-valued rho(z), and a dimpled (folded) profile such
 as Cassini's is not one. Along a simple closed curve the signed sum is exact —
 where a z-plane crosses the curve three times it gives rho1^2 - rho2^2 +
 rho3^2, the disk plus the annulus — and a separated shape's two tip nodes keep
-the void at rho = 0. Single-valued profiles (beta's descending parametric z,
-FoS's ascending one) give the same numbers as the old sorted integral.
+the void at rho = 0. The split clips every segment at the plane rather than
+cutting the curve at one chosen crossing: by Green's theorem the volume below
+the plane is the signed integral over the part of the curve below it (the
+chord on the plane has dz = 0, the axis rho = 0), whatever the number of
+crossings. So a dimple reaching past the plane is split correctly, and a pole
+cap that runs along the axis adds nothing on either side — FoS's poles are
+R(θ)-frame values (zero-filled on failure) that can lie inside its profile.
 """
 from __future__ import annotations
 
@@ -54,34 +59,25 @@ def fragment_volumes(z: Array, rho: Array, z_neck: float,
     rc = np.concatenate(([0.0], rho, [0.0]))
 
     # Signed trapezoid of pi * rho^2 per segment, oriented so the total is positive.
-    dv = 0.5 * np.pi * (rc[:-1] ** 2 + rc[1:] ** 2) * np.diff(zc)
-    total = float(dv.sum())
+    z0, z1, r0, r1 = zc[:-1], zc[1:], rc[:-1], rc[1:]
+    full = 0.5 * np.pi * (r0**2 + r1**2) * (z1 - z0)
+    total = float(full.sum())
     if not np.isfinite(total) or total == 0.0:
         return 0.0, 0.0
-    sign = float(np.sign(total))
-    dv *= sign
 
-    # Cut the curve where it crosses the plane z = z_neck; of several crossings
-    # (a fold reaching the plane) the neck is the one with the smallest rho.
-    z_neck = float(np.clip(z_neck, zc.min(), zc.max()))
-    d = zc - z_neck
-    seg = np.flatnonzero(((d[:-1] <= 0.0) & (d[1:] >= 0.0))
-                         | ((d[:-1] >= 0.0) & (d[1:] <= 0.0)))
-    if seg.size == 0:
-        return 0.0, 0.0
-    dz = zc[seg + 1] - zc[seg]
-    t = np.divide(-d[seg], dz, out=np.zeros_like(dz), where=dz != 0.0)
-    rho_cut = rc[seg] + t * (rc[seg + 1] - rc[seg])
-    k = int(np.argmin(rho_cut))
-    i, r_cut = int(seg[k]), float(rho_cut[k])
-
-    # The cut segment splits into (z_i -> z_neck) and (z_neck -> z_i+1); the
-    # piece holding the first pole lies on that pole's side of the plane.
-    w_in = 0.5 * np.pi * sign * (rc[i] ** 2 + r_cut**2) * (z_neck - zc[i])
-    w_out = 0.5 * np.pi * sign * (r_cut**2 + rc[i + 1] ** 2) * (zc[i + 1] - z_neck)
-    v_first = float(dv[:i].sum() + w_in)
-    v_second = float(w_out + dv[i + 1:].sum())
-    v_below, v_above = (v_first, v_second) if south_first else (v_second, v_first)
+    # Clip each segment at the plane z = z_neck (rho interpolated linearly at
+    # the cut) and keep its part below; a segment touching the plane at an
+    # end lies on the side of its midpoint.
+    d0, d1 = z0 - z_neck, z1 - z_neck
+    cross = d0 * d1 < 0.0
+    t = np.divide(d0, d0 - d1, out=np.zeros_like(d0), where=cross)
+    r_cut2 = (r0 + t * (r1 - r0)) ** 2
+    head = 0.5 * np.pi * (r0**2 + r_cut2) * (z_neck - z0)    # z0 -> plane
+    tail = 0.5 * np.pi * (r_cut2 + r1**2) * (z1 - z_neck)    # plane -> z1
+    below = np.where(cross, np.where(d0 < 0.0, head, tail),
+                     np.where(d0 + d1 < 0.0, full, 0.0))
+    v_below = float(np.sign(total) * below.sum())
+    v_above = abs(total) - v_below
     if not (np.isfinite(v_below) and np.isfinite(v_above)):
         return 0.0, 0.0
     if v_below + v_above <= 0.0:

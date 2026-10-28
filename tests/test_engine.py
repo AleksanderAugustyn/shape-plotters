@@ -385,3 +385,19 @@ def test_zero_radius_neck_line_is_visible(monkeypatch) -> None:
         assert list(xs) == pytest.approx([0.1, 0.1])
         assert list(ys) == pytest.approx([-half, half])
     plt.close(a.fig)
+
+
+def test_fos_asymmetric_shape_keeps_its_fragment_split() -> None:
+    # fos's R(θ)-frame north pole (0.95) lies inside its profile (which reaches
+    # z = 2.39) and below the neck plane (1.44): the split must still show.
+    import re
+    import matplotlib.pyplot as plt
+    a = ShapePlotterApp(FoSRender())
+    shape = dict(c=2.02, a3=0.48, a4=-0.07, a5=0.18, a6=-0.08, a7=-0.03, a8=0.13)
+    for key, val in shape.items():
+        a.rows[key].slider.set_val(val)
+    assert a.last_result.ok and a.last_result.neck is not None
+    vol = re.search(r"vol frac = ([\d.]+) : ([\d.]+)", a.stats_text.get_text())
+    assert vol is not None
+    assert (float(vol.group(1)), float(vol.group(2))) == (0.92, 0.08)
+    plt.close(a.fig)

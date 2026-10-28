@@ -98,7 +98,8 @@ def test_dimpled_shape_is_valid(render: CassiniRender) -> None:
     assert res.neck is not None
     assert res.neck.rho == pytest.approx(0.687014, abs=1e-5)
     assert res.neck.z == pytest.approx(0.0, abs=1e-12)
-    # d_min is sampled on the scan grid (spec); N_X_GRID = 2049 agrees with 32769 to 1e-6.
+    # The refined minimum of d (library d50bf6c), not the plan's 0.62747: that
+    # was a 65-node sampled value from before the refinement.
     assert res.scalars["d_min"] == pytest.approx(0.62734, abs=1e-5)
     assert res.r_north == pytest.approx(1.189942, abs=1e-5)
 
