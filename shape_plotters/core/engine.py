@@ -47,6 +47,10 @@ UNITS_LABEL = "fm units"
 # R0 = 1.16 fm equals WMMM's geometric R0; see FORD.md / v0.2 handoff).
 SCISSION_BAND_FM = (1.2, 1.5)
 
+# Display half-height (R0 units, scaled like lengths) of a zero-radius neck
+# line: a pinched or separated shape's split plane would otherwise be a point.
+NECK_LINE_MIN_HALF_HEIGHT = 0.15
+
 # Headroom of a mid-drag refit, as an autoscale margin: when a dragged shape
 # outgrows the held view, the view jumps out this far so the next frames fit.
 DRAG_MARGIN = 0.25
@@ -377,6 +381,8 @@ class ShapePlotterApp:
         self.shape_lower.set_data(z_c, -rho_c)
         if result.neck is not None:
             zn, rn_neck = result.neck.z * scale, result.neck.rho * scale
+            if result.neck.rho == 0.0:
+                rn_neck = NECK_LINE_MIN_HALF_HEIGHT * scale
             self.neck_line.set_data([zn, zn], [-rn_neck, rn_neck])
             self.neck_line.set_visible(True)
         else:

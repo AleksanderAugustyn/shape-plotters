@@ -365,3 +365,23 @@ def test_no_rtheta_overlay_for_tqs_steep_shape() -> None:
     assert not a.rtheta_zcm.get_visible()
     assert not a.shape_legend.get_visible()
     plt.close(a.fig)
+
+
+def test_zero_radius_neck_line_is_visible(monkeypatch) -> None:
+    # A pinched or separated shape has rho_neck = 0: its split plane is drawn
+    # with a fixed display half-height instead of collapsing to a point.
+    import matplotlib.pyplot as plt
+    from shape_plotters.core.engine import NECK_LINE_MIN_HALF_HEIGHT
+    from shape_plotters.core.result import NeckInfo
+    a = ShapePlotterApp(FoSRender())
+    a._on_check("fm units")                       # -> R0 units, scale 1
+    base = a.last_result
+    for rho_neck, half in ((0.0, NECK_LINE_MIN_HALF_HEIGHT), (0.3, 0.3)):
+        res = dataclasses.replace(base, neck=NeckInfo(z=0.1, rho=rho_neck, depth=0.0, source="lib"))
+        monkeypatch.setattr(a.render, "compute", lambda params, toggles, res=res: res)
+        a.update()
+        assert a.neck_line.get_visible()
+        xs, ys = a.neck_line.get_data()
+        assert list(xs) == pytest.approx([0.1, 0.1])
+        assert list(ys) == pytest.approx([-half, half])
+    plt.close(a.fig)
