@@ -10,6 +10,7 @@ shared engine draws the figure; each shape parameterization is a render module.
 | `fos` | Fourier-over-Spheroid | c, a3–a8 | [fos-parameterization](https://github.com/AleksanderAugustyn/fos-parameterization) |
 | `tqs` | three quadratic surfaces (Nix) | σ1, σ2, σ3, α2, α3 | tqs-parameterization (optional, not yet on PyPI; see Run) |
 | `cassini` | Cassini ovals (Pashkevich) | α, α1–α4 | cassini-parameterization (optional, not yet on PyPI; see Run) |
+| `funnyhills` | Funny Hills (Brack et al.) | c, h, α | funnyhills-parameterization (optional, not yet on PyPI; see Run) |
 
 The shapes are not re-implemented here. R(θ) and the analytic dR/dθ come from
 the compiled libraries, evaluated on a 2048-node Gauss-Legendre grid in cos θ.
@@ -69,11 +70,13 @@ rendering sluggish (~5× slower).
     shape-plotters fos
     shape-plotters tqs
     shape-plotters cassini
+    shape-plotters funnyhills
 
 `python -m shape_plotters beta` does the same.
 
-`tqs` appears only when `tqs-parameterization` is installed, and `cassini`
-only when `cassini-parameterization` is. Neither is on PyPI yet: install each
+`tqs` appears only when `tqs-parameterization` is installed, `cassini` only
+when `cassini-parameterization` is, and `funnyhills` only when
+`funnyhills-parameterization` is. None of them is on PyPI yet: install each
 from a wheel built locally in its library repo. Without them, `beta` and `fos`
 work as usual and `--help` lists only those two.
 

@@ -13,7 +13,8 @@ from shape_plotters.renders.fos import FoSRender
 _real_find_spec = importlib.util.find_spec
 HAS_TQS = importlib.util.find_spec("tqs_parameterization") is not None
 HAS_CASSINI = importlib.util.find_spec("cassini_parameterization") is not None
-_OPTIONAL = ("tqs_parameterization", "cassini_parameterization")
+HAS_FUNNYHILLS = importlib.util.find_spec("funnyhills_parameterization") is not None
+_OPTIONAL = ("tqs_parameterization", "cassini_parameterization", "funnyhills_parameterization")
 
 
 class _SpyApp:
@@ -48,6 +49,7 @@ def test_module_is_runnable() -> None:
     assert "beta" in out.stdout and "fos" in out.stdout
     assert ("tqs" in out.stdout) == HAS_TQS
     assert ("cassini" in out.stdout) == HAS_CASSINI
+    assert ("funnyhills" in out.stdout) == HAS_FUNNYHILLS
 
 
 @pytest.mark.skipif(not HAS_TQS, reason="tqs_parameterization not installed")
@@ -68,6 +70,16 @@ def test_cassini_registered_when_importable(monkeypatch) -> None:
     cli.main(["cassini"])
     (app,) = _SpyApp.instances
     assert type(app.render) is CassiniRender and app.ran
+
+
+@pytest.mark.skipif(not HAS_FUNNYHILLS, reason="funnyhills_parameterization not installed")
+def test_funnyhills_registered_when_importable(monkeypatch) -> None:
+    from shape_plotters.renders.funnyhills import FunnyhillsRender
+    _SpyApp.instances = []
+    monkeypatch.setattr(cli, "ShapePlotterApp", _SpyApp)
+    cli.main(["funnyhills"])
+    (app,) = _SpyApp.instances
+    assert type(app.render) is FunnyhillsRender and app.ran
 
 
 def _registry_hiding(monkeypatch, hidden: tuple[str, ...]) -> list[str]:
@@ -91,3 +103,11 @@ def test_registry_without_cassini_only(monkeypatch) -> None:
     renders = _registry_hiding(monkeypatch, ("cassini_parameterization",))
     assert "cassini" not in renders
     assert ("tqs" in renders) == HAS_TQS
+    assert ("funnyhills" in renders) == HAS_FUNNYHILLS
+
+
+def test_registry_without_funnyhills_only(monkeypatch) -> None:
+    renders = _registry_hiding(monkeypatch, ("funnyhills_parameterization",))
+    assert "funnyhills" not in renders
+    assert ("tqs" in renders) == HAS_TQS
+    assert ("cassini" in renders) == HAS_CASSINI
